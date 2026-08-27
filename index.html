@@ -1,5 +1,24 @@
 <title>HG Fashion · Nómina</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIGURACIÓN — lo único que hay que editar en todo el archivo
+
+   Pega entre las comillas la clave "anon public" de Supabase:
+   Project Settings → API Keys → anon public
+
+   Mientras esté vacía, la aplicación se la pedirá a cada persona.
+   Con la clave escrita aquí, nadie más tiene que hacerlo.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const SUPABASE_URL = 'https://aiwbjnoafonhjesjllib.supabase.co';
+
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpd2Jqbm9hZm9uaGplc2psbGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3OTkyNTAsImV4cCI6MjEwMzM3NTI1MH0.zgfb8JTlBb2W0vNmsev-Pxfg2rn_X8e5LPK5gqNsY1Y';
+
+/* ═══════════════════════════════════════════════════════════════════ */
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -396,9 +415,12 @@ const LOGO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAA
    los datos son las políticas RLS, no el secreto de esta clave.
    ===================================================================== */
 const CFG = {
-  url: localStorage.getItem('sb_url') || 'https://aiwbjnoafonhjesjllib.supabase.co',
-  key: localStorage.getItem('sb_key') || '',
+  url: (typeof SUPABASE_URL!=='undefined' && SUPABASE_URL)      || localStorage.getItem('sb_url') || '',
+  key: (typeof SUPABASE_ANON_KEY!=='undefined' && SUPABASE_ANON_KEY) || localStorage.getItem('sb_key') || '',
 };
+// Si la clave viene escrita en el archivo, manda esa: así una copia guardada
+// en el navegador nunca tapa la configuración oficial del sitio.
+const CLAVE_EN_ARCHIVO = typeof SUPABASE_ANON_KEY!=='undefined' && !!SUPABASE_ANON_KEY;
 let sb = null;
 function conectar(){
   if(!CFG.url || !CFG.key) return false;
@@ -729,6 +751,10 @@ function pantallaConfig(msg){
   document.getElementById('login').style.display='flex';
   document.getElementById('app').classList.remove('on');
 }
+function olvidarConfig(){
+  localStorage.removeItem('sb_url'); localStorage.removeItem('sb_key');
+  location.reload();
+}
 function guardarConfig(){
   const u=document.getElementById('cfg_url').value.trim().replace(/\/$/,'');
   const kk=document.getElementById('cfg_key').value.trim();
@@ -761,8 +787,8 @@ function pantallaLogin(msg){
       </div>
       <p class="hintx" style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--line-2)">
         ¿Sin cuenta? El gerente general envía las invitaciones desde
-        <b>Usuarios</b>. <button class="btn ghost sm" style="margin-top:8px"
-        onclick="pantallaConfig()">Cambiar conexión</button></p>
+        <b>Usuarios</b>.${CLAVE_EN_ARCHIVO?'':`<br><button class="btn ghost sm" style="margin-top:8px"
+        onclick="pantallaConfig()">Cambiar conexión</button>`}</p>
     </div>`;
   document.getElementById('login').style.display='flex';
   document.getElementById('app').classList.remove('on');
