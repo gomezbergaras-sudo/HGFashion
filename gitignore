@@ -1,0 +1,40 @@
+# Dependencias
+node_modules/
+.pnp/
+.pnp.js
+
+# Build
+dist/
+build/
+.vite/
+*.local
+
+# Entorno — NUNCA subir estos archivos
+.env
+.env.*
+!.env.example
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y cobertura
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/
+
+# Datos sensibles — respaldos y exportaciones de nómina
+*.dump
+*.sql.gz
+respaldos/
+exportaciones/
