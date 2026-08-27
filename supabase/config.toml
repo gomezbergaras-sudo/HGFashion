@@ -1,0 +1,34 @@
+project_id = "hgfashion"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]          # el esquema rrhh NO se expone por PostgREST
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = false          # las altas son por invitación del gerente
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+
+[storage]
+enabled = true
+file_size_limit = "20MiB"
+
+[functions.sync-bcv]
+verify_jwt = false             # la invoca el scheduler, no un usuario

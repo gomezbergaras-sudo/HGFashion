@@ -1,0 +1,966 @@
+<title>Nómina Retail Venezuela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --ground:#FBFAF7;
+  --surface:#FFFFFF;
+  --sunken:#F2EFE9;
+  --ink:#1E2128;
+  --ink-2:#4A4740;
+  --ink-3:#7A756B;
+  --line:#DFDACF;
+  --line-2:#EBE7DE;
+  --accent:#A8641F;
+  --accent-soft:#F5E7D4;
+  --teal:#2F5D62;
+  --teal-soft:#DDE9E8;
+  --good:#3D6B3D;
+  --warn:#96601B;
+  --crit:#9C382C;
+  --crit-soft:#F7E2DE;
+  --shadow:0 1px 2px rgba(30,33,40,.05), 0 8px 24px -12px rgba(30,33,40,.12);
+  --maxw:1220px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#15171C;
+    --surface:#1C1F26;
+    --sunken:#22262E;
+    --ink:#E7E3DA;
+    --ink-2:#B4AFA4;
+    --ink-3:#867F73;
+    --line:#333842;
+    --line-2:#282D35;
+    --accent:#D89A55;
+    --accent-soft:#38291A;
+    --teal:#7FB3B6;
+    --teal-soft:#1D2B2C;
+    --good:#7CAE7C;
+    --warn:#D0A05A;
+    --crit:#DE8677;
+    --crit-soft:#3A211D;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#15171C; --surface:#1C1F26; --sunken:#22262E;
+  --ink:#E7E3DA; --ink-2:#B4AFA4; --ink-3:#867F73;
+  --line:#333842; --line-2:#282D35;
+  --accent:#D89A55; --accent-soft:#38291A;
+  --teal:#7FB3B6; --teal-soft:#1D2B2C;
+  --good:#7CAE7C; --warn:#D0A05A; --crit:#DE8677; --crit-soft:#3A211D;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  font-size:17px;
+  line-height:1.62;
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:"Zilla Slab",Georgia,serif;text-wrap:balance;margin:0;line-height:1.2}
+p{margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+
+/* ---------- shell ---------- */
+.shell{max-width:var(--maxw);margin:0 auto;padding:0 28px 120px}
+.masthead{
+  border-bottom:1px solid var(--line);
+  padding:56px 0 32px;
+  margin-bottom:44px;
+}
+.eyebrow{
+  font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  font-weight:600;color:var(--accent);margin-bottom:18px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line);min-width:20px}
+.masthead h1{font-size:clamp(34px,5.2vw,54px);font-weight:600;letter-spacing:-.015em;max-width:16ch}
+.masthead .lede{margin-top:20px;font-size:20px;color:var(--ink-2);max-width:62ch;font-weight:300}
+.meta-row{
+  display:flex;flex-wrap:wrap;gap:0;margin-top:34px;
+  border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--surface);
+}
+.meta-row div{
+  padding:14px 20px;flex:1 1 150px;border-right:1px solid var(--line-2);
+}
+.meta-row div:last-child{border-right:0}
+.meta-row dt{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.meta-row dd{margin:4px 0 0;font-size:15px;font-weight:600;font-family:"Zilla Slab",serif}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:1fr;gap:0}
+@media(min-width:1000px){
+  .cols{grid-template-columns:216px 1fr;gap:56px;align-items:start}
+  nav.toc{position:sticky;top:32px;display:block}
+}
+nav.toc{display:none;font-size:14px}
+nav.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+nav.toc a{
+  display:flex;gap:10px;text-decoration:none;color:var(--ink-2);
+  padding:6px 10px;border-radius:3px;border-left:2px solid transparent;
+}
+nav.toc a:hover{background:var(--sunken);color:var(--ink);border-left-color:var(--accent)}
+nav.toc .n{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-3);padding-top:2px}
+nav.toc .tocdiv{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;margin:20px 0 8px 10px}
+
+/* ---------- sections ---------- */
+section{scroll-margin-top:24px;margin-bottom:80px}
+.sechead{display:flex;gap:16px;align-items:baseline;border-top:2px solid var(--ink);
+  padding-top:14px;margin-bottom:26px}
+.sechead .num{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:500;
+  color:var(--accent);padding-top:5px}
+.sechead h2{font-size:clamp(25px,3.2vw,32px);font-weight:600;letter-spacing:-.01em}
+h3{font-size:21px;font-weight:600;margin:38px 0 14px;letter-spacing:-.005em}
+h4{font-size:15px;font-weight:600;margin:26px 0 10px;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--ink-2);font-family:"Source Sans 3",sans-serif}
+.prose{max-width:70ch}
+.prose p{margin-bottom:16px}
+.prose ul,.prose ol{max-width:70ch;padding-left:22px;margin:0 0 18px}
+.prose li{margin-bottom:9px}
+strong{font-weight:600}
+code{font-family:"JetBrains Mono",monospace;font-size:.86em;background:var(--sunken);
+  padding:1px 5px;border-radius:3px;color:var(--ink)}
+
+/* ---------- callouts ---------- */
+.callout{
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:3px;padding:18px 22px;margin:24px 0;box-shadow:var(--shadow);
+}
+.callout.risk{border-left-color:var(--crit);background:var(--crit-soft)}
+.callout.risk .chip{background:var(--crit);color:#fff}
+.callout .chip{
+  display:inline-block;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  font-weight:700;background:var(--accent);color:#fff;padding:3px 9px;border-radius:2px;
+  margin-bottom:10px;
+}
+.callout p{font-size:16px;margin-bottom:10px}
+.callout p:last-child{margin-bottom:0}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:3px;
+  margin:22px 0;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+thead th{
+  text-align:left;font-family:"Source Sans 3",sans-serif;font-weight:600;font-size:11.5px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  padding:11px 16px;border-bottom:1px solid var(--line);background:var(--sunken);
+  white-space:nowrap;
+}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:"JetBrains Mono",monospace;font-size:13px}
+td code{font-size:12.5px;white-space:nowrap}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;
+  letter-spacing:.03em;white-space:nowrap}
+.pill.ok{background:var(--teal-soft);color:var(--teal)}
+.pill.sal{background:var(--accent-soft);color:var(--accent)}
+.pill.no{background:var(--sunken);color:var(--ink-3)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}
+
+/* ---------- code ---------- */
+pre{
+  background:var(--sunken);border:1px solid var(--line);border-radius:3px;
+  padding:18px 20px;overflow-x:auto;margin:20px 0;
+  font-family:"JetBrains Mono",monospace;font-size:12.8px;line-height:1.65;
+  color:var(--ink);
+}
+pre code{background:none;padding:0;font-size:inherit}
+.c{color:var(--ink-3)}
+.k{color:var(--accent);font-weight:500}
+.s{color:var(--teal)}
+
+/* ---------- module map ---------- */
+.modmap{display:grid;gap:14px;margin:26px 0;
+  grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+.mod{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  padding:16px 18px;box-shadow:var(--shadow)}
+.mod h5{margin:0 0 4px;font-family:"Zilla Slab",serif;font-size:16px;font-weight:600}
+.mod .tag{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:600;color:var(--accent);display:block;margin-bottom:9px}
+.mod ul{margin:0;padding-left:16px;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+.mod li{margin-bottom:3px}
+
+/* ---------- matrix ---------- */
+.matrix td:first-child{font-weight:600}
+.matrix td:not(:first-child){text-align:center}
+.y{color:var(--good);font-weight:700}
+.n{color:var(--ink-3)}
+.p{color:var(--warn);font-weight:700}
+
+/* ---------- timeline ---------- */
+.phases{display:flex;flex-direction:column;gap:0;margin:26px 0;
+  border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--surface)}
+.phase{display:grid;grid-template-columns:64px 1fr;gap:20px;padding:20px 22px;
+  border-bottom:1px solid var(--line-2)}
+.phase:last-child{border-bottom:0}
+.phase .wk{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--accent);
+  font-weight:500;padding-top:3px;letter-spacing:-.02em}
+.phase h5{margin:0 0 6px;font-family:"Zilla Slab",serif;font-size:17px;font-weight:600}
+.phase p{font-size:14.5px;color:var(--ink-2)}
+
+/* ---------- receipt ---------- */
+.receipt{background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  padding:0;margin:24px 0;max-width:520px;box-shadow:var(--shadow);overflow:hidden;
+  font-size:13.5px}
+.receipt .rhead{padding:16px 20px;border-bottom:1px dashed var(--line);text-align:center}
+.receipt .rhead strong{display:block;font-family:"Zilla Slab",serif;font-size:16px}
+.receipt .rhead span{color:var(--ink-3);font-size:12px}
+.receipt .rsec{padding:12px 20px;border-bottom:1px dashed var(--line)}
+.receipt .rsec:last-child{border-bottom:0}
+.receipt .rlab{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);font-weight:700;margin-bottom:8px}
+.receipt .rline{display:flex;justify-content:space-between;gap:16px;padding:2px 0}
+.receipt .rline span:last-child{font-family:"JetBrains Mono",monospace;
+  font-variant-numeric:tabular-nums;font-size:12.5px}
+.receipt .rtot{font-weight:700;border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+.receipt .rnet{background:var(--sunken);font-weight:700;font-size:15px}
+
+.footnote{font-size:14px;color:var(--ink-3);max-width:70ch;margin-top:10px;font-style:italic}
+.srcs{border-top:1px solid var(--line);padding-top:24px;margin-top:70px;font-size:14px;color:var(--ink-3)}
+.srcs h4{margin-top:0}
+.srcs li{margin-bottom:6px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="shell">
+
+<header class="masthead">
+  <div class="eyebrow">Especificación técnica · Supabase + React · Agosto 2026</div>
+  <h1>Plataforma de RRHH y Nómina para Retail Venezolano</h1>
+  <p class="lede">Arquitectura, modelo de datos y motor de cálculo legal para una cadena de 20 tiendas de ropa,
+  diseñada alrededor del problema que rompe todos los sistemas de nómina en Venezuela:
+  el salario legal y el ingreso real dejaron de ser la misma cosa.</p>
+  <dl class="meta-row">
+    <div><dt>Backend</dt><dd>Supabase / PostgreSQL 15</dd></div>
+    <div><dt>Frontend</dt><dd>React 18 + TS + Vite</dd></div>
+    <div><dt>Tablas</dt><dd>31 + 3 vistas materializadas</dd></div>
+    <div><dt>Estado del SQL</dt><dd>Probado en PG 16</dd></div>
+    <div><dt>Cronograma</dt><dd>22 semanas</dd></div>
+  </dl>
+</header>
+
+<div class="cols">
+
+<nav class="toc" aria-label="Contenido">
+  <ol>
+    <li class="tocdiv">Contenido</li>
+    <li><a href="#s1"><span class="n">01</span><span>Resumen ejecutivo</span></a></li>
+    <li><a href="#s2"><span class="n">02</span><span>Arquitectura</span></a></li>
+    <li><a href="#s3"><span class="n">03</span><span>Modelo de datos</span></a></li>
+    <li><a href="#s4"><span class="n">04</span><span>Seguridad y RLS</span></a></li>
+    <li><a href="#s5"><span class="n">05</span><span>Cálculos legales</span></a></li>
+    <li><a href="#s6"><span class="n">06</span><span>Repositorio</span></a></li>
+    <li><a href="#s7"><span class="n">07</span><span>Pantallas</span></a></li>
+    <li><a href="#s8"><span class="n">08</span><span>Flujos de trabajo</span></a></li>
+    <li><a href="#s9"><span class="n">09</span><span>Cronograma</span></a></li>
+    <li><a href="#s10"><span class="n">10</span><span>Recomendaciones</span></a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <div class="sechead"><span class="num">01</span><h2>Resumen ejecutivo</h2></div>
+  <div class="prose">
+    <p>La plataforma cubre el ciclo completo de personal para 20 tiendas: contratación, asistencia,
+    incidencias, nómina, prestaciones, vacaciones, utilidades y liquidaciones, con control de acceso
+    por tienda y por jerarquía, y auditoría de todo lo que tenga consecuencia legal o económica.</p>
+
+    <p>Tres decisiones de diseño gobiernan el resto del sistema. Las tres nacen del mismo hecho:
+    en Venezuela un sistema de nómina no puede tratar la ley como una constante.</p>
+
+    <h4>1 · Ningún valor legal vive en el código</h4>
+    <p>Salario mínimo, cestaticket, unidad tributaria, alícuotas de IVSS, FAOV, INCES y RPE, topes de
+    horas extra, recargos: todo vive en la tabla <code>parametros_legales</code> con vigencia
+    <em>desde–hasta</em>. Un decreto no requiere un despliegue, requiere un <code>INSERT</code>.
+    Y como la vigencia anterior se cierra en lugar de borrarse, una nómina de marzo recalculada en
+    2029 reproduce exactamente los valores de marzo.</p>
+
+    <h4>2 · Los conceptos de nómina son datos, no columnas</h4>
+    <p>No existe una columna <code>cestaticket</code> ni <code>bono_guerra</code>. Existe un catálogo
+    <code>conceptos_nomina</code> donde cada concepto declara su <strong>carácter</strong> —salarial,
+    no salarial, deducción o aporte patronal— y su incidencia en prestaciones, vacaciones, utilidades
+    e ISLR. Crear el bono que anuncien el año que viene es una fila nueva, no una migración.</p>
+
+    <h4>3 · La incidencia salarial es una restricción, no una convención</h4>
+    <p>El sistema impide por diseño que un concepto marcado como no salarial incida en prestaciones.
+    Esto no es purismo: es el punto exacto donde se generan los pasivos laborales que aparecen
+    años después en un tribunal.</p>
+
+    <div class="callout risk">
+      <span class="chip">Riesgo legal · leer antes de configurar</span>
+      <p>El ajuste de 2026 al ingreso mínimo integral de USD 240 se instrumentó vía bonificaciones,
+      no vía salario. El salario mínimo base sigue en Bs. 130 desde marzo de 2022.
+      Eso significa que si usted paga USD 200 como «bono», las prestaciones de ese trabajador se
+      calculan sobre casi nada — y la diferencia es una deuda que se acumula en silencio.</p>
+      <p>La vista <code>v_pasivo_laboral</code> existe precisamente para que esa cifra sea visible
+      cada mes en el dashboard del gerente, en bolívares y en dólares, en lugar de aparecer completa
+      el día de una demanda. <strong>Decidir qué porción del paquete es salarial es una decisión de
+      la empresa con su abogado laboral, no un parámetro que este documento pueda fijar.</strong></p>
+    </div>
+
+    <h4>Estado de la entrega</h4>
+    <p>El esquema completo —31 tablas, 24 funciones de cálculo, 14 triggers, 47 políticas RLS,
+    3 vistas materializadas y el <em>seed</em> con las 20 tiendas— fue ejecutado contra PostgreSQL 16
+    y probado con casos reales. Los resultados de esas pruebas están en la sección 5.</p>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <div class="sechead"><span class="num">02</span><h2>Arquitectura del sistema</h2></div>
+  <div class="prose">
+    <p>Arquitectura de tres capas donde <strong>la base de datos es la autoridad</strong>. Las reglas
+    laborales viven en PostgreSQL como funciones y restricciones, no en el frontend: cualquier cliente
+    —la PWA, un script de importación, una consulta directa— queda sujeto a las mismas reglas.</p>
+  </div>
+
+  <div class="modmap">
+    <div class="mod">
+      <span class="tag">Capa de datos</span>
+      <h5>PostgreSQL</h5>
+      <ul>
+        <li>Esquema <code>public</code>: tablas expuestas vía PostgREST</li>
+        <li>Esquema <code>rrhh</code>: funciones de cálculo, no expuesto</li>
+        <li>RLS activa en las 31 tablas</li>
+        <li>Auditoría por trigger en 8 tablas críticas</li>
+      </ul>
+    </div>
+    <div class="mod">
+      <span class="tag">Lógica pesada</span>
+      <h5>Edge Functions</h5>
+      <ul>
+        <li><code>calcular-nomina</code> — orquesta el periodo</li>
+        <li><code>generar-recibo</code> — PDF + hash + Storage</li>
+        <li><code>sync-bcv</code> — tasa oficial diaria</li>
+        <li><code>cierre-trimestral</code> — garantía art. 142</li>
+        <li><code>exportar-tiuna</code> — archivo IVSS</li>
+      </ul>
+    </div>
+    <div class="mod">
+      <span class="tag">Identidad</span>
+      <h5>Supabase Auth</h5>
+      <ul>
+        <li>Email + contraseña, invitación por correo</li>
+        <li>Rol y tienda en la tabla <code>perfiles</code></li>
+        <li>Helpers <code>SECURITY DEFINER</code> sin recursión</li>
+        <li>Refresh tokens y sesión persistente</li>
+      </ul>
+    </div>
+    <div class="mod">
+      <span class="tag">Archivos</span>
+      <h5>Storage</h5>
+      <ul>
+        <li><code>documentos-empleados</code> — privado</li>
+        <li><code>recibos</code> — privado, URL firmada</li>
+        <li><code>logos</code> — público</li>
+        <li><code>respaldos-nomina</code> — solo servicio</li>
+      </ul>
+    </div>
+    <div class="mod">
+      <span class="tag">Tiempo real</span>
+      <h5>Realtime</h5>
+      <ul>
+        <li>Marcajes del día por tienda</li>
+        <li>Incidencias pendientes de aprobación</li>
+        <li>Cambio de tasa BCV</li>
+        <li>Avance del cálculo de nómina</li>
+      </ul>
+    </div>
+    <div class="mod">
+      <span class="tag">Cliente</span>
+      <h5>PWA React</h5>
+      <ul>
+        <li>Vite + TypeScript + Tailwind</li>
+        <li>TanStack Query (servidor) + Zustand (UI)</li>
+        <li>Service worker: marcaje sin conexión</li>
+        <li>Instalable en Android e iOS</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="prose">
+    <h3>Por qué React y no Vue o Angular</h3>
+    <p>Tres razones concretas, no preferencia: <strong>supabase-js</strong> y <code>@supabase/ssr</code>
+    tienen su soporte más maduro y mejor documentado en React; el ecosistema de tablas y formularios
+    complejos —TanStack Table, React Hook Form + Zod— es el más sólido para las pantallas densas que
+    exige una nómina; y en el mercado venezolano de desarrolladores React es, con diferencia, el perfil
+    más fácil de contratar y reemplazar. Angular sería sobredimensionado para un equipo pequeño;
+    Vue es técnicamente equivalente pero pierde en las dos primeras razones.</p>
+
+    <h3>Modo sin conexión</h3>
+    <p>Las tiendas en centros comerciales pierden conectividad con frecuencia. El marcaje de entrada
+    y salida se escribe en IndexedDB y se sincroniza cuando vuelve la red. Se resuelve con
+    <code>fecha_laboral</code> + <code>momento</code> del cliente y deduplicación por
+    <code>(empleado_id, tipo, fecha_laboral)</code>. Todo lo demás —nómina, aprobaciones,
+    reportes— exige conexión: son operaciones que no admiten un estado ambiguo.</p>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <div class="sechead"><span class="num">03</span><h2>Modelo de datos</h2></div>
+  <div class="prose">
+    <p>31 tablas agrupadas en seis dominios. Las migraciones completas están en los archivos
+    <code>.sql</code> que acompañan a este documento; aquí va el mapa y las decisiones que no son
+    obvias al leer el DDL.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Dominio</th><th>Tablas</th><th>Nota de diseño</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Organización</strong></td>
+          <td><code>empresas</code>, <code>tiendas</code>, <code>cargos</code>, <code>perfiles</code></td>
+          <td><code>perfiles</code> es el puente con <code>auth.users</code>: guarda rol y tienda, y es lo que leen todas las políticas RLS.</td></tr>
+        <tr><td><strong>Personal</strong></td>
+          <td><code>empleados</code>, <code>historial_salarios</code>, <code>documentos</code></td>
+          <td>El salario nunca se guarda en <code>empleados</code>. Vive en <code>historial_salarios</code> con rango de vigencia sin solapamiento, garantizado por <code>EXCLUDE USING gist</code>.</td></tr>
+        <tr><td><strong>Parámetros</strong></td>
+          <td><code>parametros_legales</code>, <code>tasas_cambio</code>, <code>islr_tramos</code>, <code>feriados</code>, <code>conceptos_nomina</code>, <code>empleado_conceptos</code>, <code>prestamos</code></td>
+          <td>El corazón configurable. Todo cálculo lee de aquí; ninguna función lleva números en duro.</td></tr>
+        <tr><td><strong>Asistencia</strong></td>
+          <td><code>horarios</code>, <code>horario_dias</code>, <code>empleado_horarios</code>, <code>marcajes</code>, <code>asistencias</code>, <code>horas_extra</code>, <code>incidencias</code>, <code>vacaciones_periodos</code></td>
+          <td><code>marcajes</code> es un registro crudo e inmutable —no tiene política de UPDATE ni DELETE—. <code>asistencias</code> es la consolidación diaria derivada, y es la que se paga.</td></tr>
+        <tr><td><strong>Nómina</strong></td>
+          <td><code>nominas</code>, <code>nomina_empleados</code>, <code>detalle_nomina</code>, <code>recibos_pago</code>, <code>recibos_correlativo</code></td>
+          <td>Estructura de tres niveles: periodo → empleado → líneas. Aprobada, la nómina se vuelve inmutable por trigger.</td></tr>
+        <tr><td><strong>Pasivos</strong></td>
+          <td><code>prestaciones_movimientos</code>, <code>prestaciones_saldo</code>, <code>utilidades</code>, <code>liquidaciones</code>, <code>auditoria</code></td>
+          <td>Prestaciones como libro de movimientos + saldo materializado mantenido por trigger. El saldo nunca se escribe a mano.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Las cuatro decisiones que hacen la diferencia</h3>
+  <div class="prose">
+    <h4>Vigencia en lugar de sobrescritura</h4>
+    <p>Tres tablas usan rangos de vigencia con exclusión de solapamiento:
+    <code>historial_salarios</code>, <code>parametros_legales</code> y <code>empleado_horarios</code>.
+    Un trigger cierra automáticamente la vigencia anterior al insertar la nueva. Nunca se hace
+    <code>UPDATE</code> sobre un valor histórico, porque hacerlo destruiría la capacidad de
+    reconstruir una nómina pasada.</p>
+
+    <h4>Doble moneda con la tasa congelada</h4>
+    <p>Los montos se almacenan en bolívares como <code>numeric(18,4)</code>, y cada nómina guarda la
+    <code>tasa_bcv</code> usada al calcular. Las conversiones históricas usan la tasa de la fecha del
+    hecho, no la de hoy. Si falta la tasa del día, <code>rrhh.tasa_bcv()</code> <strong>lanza
+    excepción en lugar de devolver cero</strong>: un proceso que se detiene es infinitamente mejor
+    que un recibo emitido en cero.</p>
+
+    <h4>Trazabilidad del cálculo en cada línea</h4>
+    <p>Cada fila de <code>detalle_nomina</code> lleva un campo <code>jsonb</code> con los parámetros
+    que se usaron para producirla. Cuando alguien pregunte en 2029 por qué su IVSS de agosto de 2026
+    fue esa cifra, la respuesta está en la fila, no en la memoria de nadie.</p>
+
+    <h4>Copia histórica de código y nombre</h4>
+    <p><code>detalle_nomina</code> guarda <code>codigo</code>, <code>nombre</code> y
+    <code>caracter</code> copiados del concepto al momento del cálculo. Si mañana se renombra
+    «Bono de guerra económica», los recibos ya emitidos siguen diciendo lo que decían.</p>
+  </div>
+
+  <h3>Extracto: el catálogo de conceptos</h3>
+  <pre><code><span class="c">-- La restricción que impide crear pasivos laborales por descuido</span>
+<span class="k">alter table</span> conceptos_nomina <span class="k">add constraint</span> chk_coherencia_caracter <span class="k">check</span> (
+  caracter &lt;&gt; <span class="s">'no_salarial'</span>
+  <span class="k">or</span> (incide_prestaciones = <span class="k">false</span>
+      <span class="k">and</span> incide_vacaciones   = <span class="k">false</span>
+      <span class="k">and</span> incide_utilidades   = <span class="k">false</span>)
+);
+
+<span class="c">-- El salario normal excluye los bonos no salariales (art. 104 LOTTT)</span>
+<span class="k">create or replace function</span> rrhh.salario_normal_mensual(p_empleado <span class="k">uuid</span>, p_fecha <span class="k">date</span>)
+<span class="k">returns numeric as</span> $$
+  <span class="k">select</span> rrhh.salario_base_mensual(p_empleado, p_fecha)
+       + <span class="k">coalesce</span>(<span class="k">sum</span>(rrhh.a_bolivares(ec.monto * ec.cantidad, c.moneda, p_fecha)), 0)
+  <span class="k">from</span> empleado_conceptos ec
+  <span class="k">join</span> conceptos_nomina c <span class="k">on</span> c.id = ec.concepto_id
+  <span class="k">where</span> ec.empleado_id = p_empleado
+    <span class="k">and</span> c.caracter = <span class="s">'salarial'</span>   <span class="c">-- &lt;-- aquí se decide todo</span>
+    <span class="k">and</span> p_fecha <span class="k">between</span> ec.vigente_desde <span class="k">and coalesce</span>(ec.vigente_hasta, <span class="s">'infinity'</span>);
+$$;</code></pre>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <div class="sechead"><span class="num">04</span><h2>Seguridad y control de acceso</h2></div>
+  <div class="prose">
+    <p>47 políticas RLS implementan la jerarquía. El principio: <strong>el dato salarial tiene una
+    frontera más estricta que el dato operativo</strong>. Un supervisor auxiliar puede registrar la
+    asistencia de un vendedor y no puede ver cuánto gana.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table class="matrix">
+      <thead><tr>
+        <th>Capacidad</th><th>Gerente</th><th>Sup. tienda</th><th>Sup. auxiliar</th><th>Empleado</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Ver empleados</td><td class="y">Todas</td><td class="p">Su tienda</td><td class="p">Su tienda</td><td class="p">Solo él</td></tr>
+        <tr><td>Crear / egresar empleado</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Ver salarios</td><td class="y">Todas</td><td class="p">Su tienda</td><td class="n">No</td><td class="p">El suyo</td></tr>
+        <tr><td>Modificar salarios</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Registrar asistencia</td><td class="y">Sí</td><td class="y">Sí</td><td class="y">Sí</td><td class="p">Su marcaje</td></tr>
+        <tr><td>Registrar horas extra</td><td class="y">Sí</td><td class="y">Sí</td><td class="y">Sí</td><td class="n">No</td></tr>
+        <tr><td>Aprobar horas extra</td><td class="y">Sí</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Reportar incidencia</td><td class="y">Sí</td><td class="y">Sí</td><td class="y">Sí</td><td class="p">Solicitar</td></tr>
+        <tr><td>Aprobar incidencia</td><td class="y">Sí</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Despidos y suspensiones</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Calcular nómina</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Ver nómina</td><td class="y">Consolidada</td><td class="p">Su tienda</td><td class="n">No</td><td class="p">Su recibo</td></tr>
+        <tr><td>Aprobar nómina</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+        <tr><td>Parámetros legales</td><td class="y">Sí</td><td class="n">Lectura</td><td class="n">Lectura</td><td class="n">Lectura</td></tr>
+        <tr><td>Leer auditoría</td><td class="y">Sí</td><td class="n">No</td><td class="n">No</td><td class="n">No</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Cómo se evita la recursión de RLS</h3>
+    <p>Una política sobre <code>empleados</code> que consulte <code>perfiles</code> dispararía la RLS
+    de <code>perfiles</code>, que a su vez consultaría <code>perfiles</code>. El patrón estándar
+    resuelve esto con funciones <code>SECURITY DEFINER</code> que leen el perfil saltándose la RLS:</p>
+    <pre><code><span class="k">create or replace function</span> rrhh.mi_tienda() <span class="k">returns uuid</span>
+<span class="k">language</span> sql <span class="k">stable security definer set</span> search_path = <span class="k">public</span>, rrhh <span class="k">as</span> $$
+  <span class="k">select</span> tienda_id <span class="k">from</span> perfiles <span class="k">where</span> id = auth.uid() <span class="k">and</span> activo;
+$$;
+
+<span class="c">-- Los salarios: el gerente, el supervisor de esa tienda, o el propio trabajador</span>
+<span class="k">create policy</span> salarios_select <span class="k">on</span> historial_salarios <span class="k">for select to</span> authenticated
+  <span class="k">using</span> (<span class="k">exists</span> (
+    <span class="k">select</span> 1 <span class="k">from</span> empleados e
+    <span class="k">where</span> e.id = historial_salarios.empleado_id
+      <span class="k">and</span> (rrhh.ve_salarios_de(e.tienda_id) <span class="k">or</span> e.usuario_id = auth.uid())));</code></pre>
+
+    <h4>Verificación ejecutada</h4>
+    <p>Las políticas se probaron simulando cinco sesiones reales contra la base con datos.
+    Todos los resultados coincidieron con lo esperado:</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Sesión</th><th>Consulta</th><th class="num">Esperado</th><th class="num">Obtenido</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td>Gerente general</td><td>Empleados visibles</td><td class="num">2</td><td class="num">2</td><td><span class="pill ok">Correcto</span></td></tr>
+        <tr><td>Supervisor T001</td><td>Empleados visibles</td><td class="num">1</td><td class="num">1</td><td><span class="pill ok">Correcto</span></td></tr>
+        <tr><td>Supervisor T002</td><td>Empleados visibles</td><td class="num">1</td><td class="num">1</td><td><span class="pill ok">Correcto</span></td></tr>
+        <tr><td>Auxiliar T001</td><td>Registros salariales</td><td class="num">0</td><td class="num">0</td><td><span class="pill ok">Correcto</span></td></tr>
+        <tr><td>Empleado</td><td>Su propio salario</td><td class="num">1</td><td class="num">1</td><td><span class="pill ok">Correcto</span></td></tr>
+        <tr><td>Supervisor T001</td><td>Intento de cambiar salario</td><td class="num">0</td><td class="num">0</td><td><span class="pill ok">Bloqueado</span></td></tr>
+        <tr><td>Auxiliar T001</td><td>Intento de aprobar horas extra</td><td class="num">0</td><td class="num">0</td><td><span class="pill ok">Bloqueado</span></td></tr>
+        <tr><td>Supervisor T001</td><td>Aprobar horas extra de su tienda</td><td class="num">1</td><td class="num">1</td><td><span class="pill ok">Permitido</span></td></tr>
+        <tr><td>Supervisor T001</td><td>Leer auditoría</td><td class="num">0</td><td class="num">0</td><td><span class="pill ok">Bloqueado</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <div class="sechead"><span class="num">05</span><h2>Cálculos legales implementados</h2></div>
+  <div class="prose">
+    <p>24 funciones en el esquema <code>rrhh</code>. Todas leen sus constantes de
+    <code>parametros_legales</code> a la fecha del cálculo.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Concepto</th><th>Fórmula</th><th>Fundamento</th></tr></thead>
+      <tbody>
+        <tr><td>Salario diario base</td><td><code>salario_mensual / 30</code></td><td>LOTTT art. 104</td></tr>
+        <tr><td>Salario normal</td><td>base + percepciones salariales regulares</td><td>LOTTT art. 104</td></tr>
+        <tr><td>Alícuota bono vacacional</td><td><code>SDN × días_BV / 360</code></td><td>LOTTT art. 122</td></tr>
+        <tr><td>Alícuota utilidades</td><td><code>SDN × días_util / 360</code></td><td>LOTTT art. 122</td></tr>
+        <tr><td>Salario integral diario</td><td><code>SDN + alíc. BV + alíc. util.</code></td><td>LOTTT art. 122</td></tr>
+        <tr><td>Hora extra diurna</td><td><code>valor_hora × 1,50</code></td><td>LOTTT art. 118</td></tr>
+        <tr><td>Hora extra nocturna</td><td><code>valor_hora × 1,30 × 1,50 = ×1,95</code></td><td>LOTTT arts. 117 y 118</td></tr>
+        <tr><td>Feriado / descanso trabajado</td><td><code>valor_hora × 1,50</code></td><td>LOTTT art. 120</td></tr>
+        <tr><td>Vacaciones</td><td><code>15 + (año − 1)</code>, tope 30 días hábiles</td><td>LOTTT art. 190</td></tr>
+        <tr><td>Bono vacacional</td><td><code>15 + (año − 1)</code>, tope 30 días</td><td>LOTTT art. 192</td></tr>
+        <tr><td>Utilidades</td><td><code>días_empresa × meses/12 × SDN</code></td><td>LOTTT art. 131</td></tr>
+        <tr><td>Garantía de prestaciones</td><td>15 días por trimestre × SDI del trimestre</td><td>LOTTT art. 142 lit. a</td></tr>
+        <tr><td>Días adicionales</td><td><code>(años − 1) × 2</code>, tope 30 días</td><td>LOTTT art. 142 lit. b</td></tr>
+        <tr><td>Retroactivo de prestaciones</td><td>30 días por año × último SDI</td><td>LOTTT art. 142 lit. c</td></tr>
+        <tr><td>Prestación a pagar</td><td><strong>el mayor</strong> entre garantía y retroactivo</td><td>LOTTT art. 142 lit. d</td></tr>
+        <tr><td>Indemnización por despido</td><td>monto igual a las prestaciones</td><td>LOTTT art. 92</td></tr>
+        <tr><td>Anticipo de prestaciones</td><td>hasta 75 % del haber acumulado</td><td>LOTTT art. 144</td></tr>
+        <tr><td>IVSS trabajador</td><td><code>base/4,3333 × 4 % × n.º lunes</code>, tope 5 SM</td><td>LSS art. 62</td></tr>
+        <tr><td>RPE trabajador</td><td><code>base/4,3333 × 0,5 % × n.º lunes</code></td><td>LRPE art. 46</td></tr>
+        <tr><td>FAOV trabajador</td><td><code>salario integral × 1 %</code></td><td>LRPVH art. 31</td></tr>
+        <tr><td>INCES trabajador</td><td><code>utilidades × 0,5 %</code> — no sobre el sueldo</td><td>Ley INCES art. 14.2</td></tr>
+        <tr><td>INCES patrono</td><td><code>salarios normales × 2 %</code></td><td>Ley INCES art. 14.1</td></tr>
+        <tr><td>Topes de horas extra</td><td>2 diarias · 10 semanales · 100 anuales</td><td>LOTTT art. 178</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="chip">Error frecuente corregido</span>
+    <p>El INCES del trabajador es <strong>0,5 % sobre las utilidades anuales</strong>, no sobre el
+    sueldo quincenal. Muchos sistemas lo descuentan en cada nómina junto al IVSS y el FAOV, lo que
+    genera una retención indebida. Aquí la función <code>rrhh.retencion_inces_trabajador()</code>
+    recibe el monto de utilidades, no el salario, y por firma no admite el uso incorrecto.</p>
+  </div>
+
+  <h3>Pruebas ejecutadas sobre PostgreSQL 16</h3>
+  <div class="prose">
+    <p>Caso base: vendedora contratada el 1.º de marzo de 2021, salario pactado en USD 200 mensuales,
+    más cestaticket USD 40 y bono de guerra USD 160 —ambos no salariales—, tasa BCV Bs. 250/USD.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Prueba</th><th class="num">Resultado</th><th>Verificación</th></tr></thead>
+      <tbody>
+        <tr><td>Salario base mensual</td><td class="num">Bs. 50.000,00</td><td>200 USD × 250</td></tr>
+        <tr><td>Salario diario normal</td><td class="num">Bs. 1.666,67</td><td>50.000 / 30</td></tr>
+        <tr><td>Alícuota bono vacacional</td><td class="num">Bs. 87,96</td><td>1.666,67 × 19 / 360</td></tr>
+        <tr><td>Alícuota utilidades</td><td class="num">Bs. 138,89</td><td>1.666,67 × 30 / 360</td></tr>
+        <tr><td>Salario integral diario</td><td class="num">Bs. 1.893,52</td><td>suma de los tres</td></tr>
+        <tr><td>Bonos excluidos del salario normal</td><td class="num">Bs. 50.000</td><td><span class="pill ok">Los USD 200 en bonos no inflan la base</span></td></tr>
+        <tr><td>Antigüedad y días de vacaciones</td><td class="num">5 años → 19 días</td><td>15 + (5 − 1)</td></tr>
+        <tr><td>Factor hora extra nocturna</td><td class="num">1,9500</td><td>1,30 × 1,50</td></tr>
+        <tr><td>Periodos de vacaciones generados</td><td class="num">5</td><td>15, 16, 17, 18 y 19 días</td></tr>
+        <tr><td>Garantía trimestral acumulada</td><td class="num">Bs. 48.284,73</td><td>2 trimestres a su SDI respectivo</td></tr>
+        <tr><td>Anticipo por encima del 75 %</td><td class="num">—</td><td><span class="pill ok">Rechazado por el trigger</span></td></tr>
+        <tr><td>Tercera hora extra en un mismo día</td><td class="num">—</td><td><span class="pill ok">Rechazada por el trigger</span></td></tr>
+        <tr><td>Nuevo cestaticket vigente 01/09/2026</td><td class="num">—</td><td><span class="pill ok">Vigencia anterior cerrada al 31/08</span></td></tr>
+        <tr><td>Liquidación por despido injustificado</td><td class="num">Bs. 912.500 · USD 3.650</td><td>desglose completo en JSON</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout risk">
+    <span class="chip">Hallazgo de las pruebas</span>
+    <p>La retención de IVSS de esa trabajadora resultó en <strong>Bs. 12,00 por quincena</strong>.
+    No es un error del sistema: el tope legal de cotización es 5 salarios mínimos, y el salario mínimo
+    sigue en Bs. 130. La cotización real es prácticamente cero.</p>
+    <p>Es correcto según la norma vigente y así debe quedar. Pero conviene saber lo que significa:
+    la protección efectiva del IVSS para ese trabajador es casi inexistente, y si el salario mínimo
+    se reajusta, la cotización se multiplicará de golpe. Por eso el tope está en
+    <code>parametros_legales</code> como <code>TOPE_SM_IVSS</code> y no dentro de la función.</p>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <div class="sechead"><span class="num">06</span><h2>Estructura del repositorio</h2></div>
+  <pre><code>rrhh-retail-ve/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                  <span class="c"># lint · typecheck · tests · build</span>
+│   │   ├── db-migrate.yml          <span class="c"># supabase db push a staging y prod</span>
+│   │   └── deploy.yml              <span class="c"># deploy del frontend</span>
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── CODEOWNERS
+├── supabase/
+│   ├── migrations/
+│   │   ├── ..._100_extensiones_y_tipos.sql
+│   │   ├── ..._200_core_organizacion.sql
+│   │   ├── ..._300_parametros_legales.sql
+│   │   ├── ..._400_asistencia_incidencias.sql
+│   │   ├── ..._500_nomina.sql
+│   │   ├── ..._600_funciones_calculo.sql
+│   │   ├── ..._700_triggers.sql
+│   │   ├── ..._800_rls.sql
+│   │   └── ..._900_vistas_auditoria.sql
+│   ├── functions/
+│   │   ├── calcular-nomina/index.ts
+│   │   ├── generar-recibo/index.ts
+│   │   ├── sync-bcv/index.ts
+│   │   ├── cierre-trimestral/index.ts
+│   │   ├── exportar-tiuna/index.ts
+│   │   └── _shared/{supabase.ts,montos.ts,pdf.ts}
+│   ├── tests/                      <span class="c"># pgTAP: cálculos y políticas RLS</span>
+│   ├── seed.sql
+│   └── config.toml
+├── src/
+│   ├── app/                        <span class="c"># router, providers, guards por rol</span>
+│   ├── features/
+│   │   ├── empleados/  asistencia/  incidencias/
+│   │   ├── nomina/     recibos/     prestaciones/
+│   │   ├── reportes/   configuracion/  auditoria/
+│   ├── components/ui/              <span class="c"># tabla, formulario, modal, moneda</span>
+│   ├── lib/{supabase.ts,formato.ts,permisos.ts}
+│   ├── hooks/  stores/  types/database.ts  <span class="c"># generado por supabase gen types</span>
+├── docs/
+│   ├── manual-usuario.md  manual-tecnico.md
+│   ├── checklist-legal-ve.md  guia-despliegue.md
+├── tests/e2e/                      <span class="c"># Playwright: un flujo por rol</span>
+├── .env.example   README.md   CONTRIBUTING.md</code></pre>
+
+  <div class="prose">
+    <h3>Flujo de ramas y CI</h3>
+    <p><code>main</code> es producción y solo recibe merges desde <code>develop</code> vía PR con
+    aprobación. <code>develop</code> es el tronco de integración. Las ramas de trabajo son
+    <code>feature/*</code>, <code>fix/*</code> y <code>legal/*</code> —esta última reservada para
+    cambios de parámetros legales, que se revisan con criterio distinto al del código—.</p>
+
+    <p>El pipeline de CI corre en cada PR: ESLint y Prettier, <code>tsc --noEmit</code>, tests de
+    Vitest, tests de pgTAP contra una instancia efímera de Supabase, y build de producción.
+    <code>db-migrate.yml</code> aplica migraciones a staging automáticamente al mergear a
+    <code>develop</code>, y a producción solo tras aprobación manual en un entorno protegido de GitHub.</p>
+
+    <div class="callout">
+      <span class="chip">Secretos</span>
+      <p>En GitHub Secrets van <code>SUPABASE_ACCESS_TOKEN</code>, <code>SUPABASE_DB_PASSWORD</code>,
+      <code>SUPABASE_PROJECT_ID</code> y las claves de despliegue. La
+      <code>SUPABASE_SERVICE_ROLE_KEY</code> <strong>nunca</strong> llega al frontend ni al bundle:
+      solo la usan las Edge Functions, donde vive como variable de entorno del proyecto.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <div class="sechead"><span class="num">07</span><h2>Pantallas principales</h2></div>
+  <div class="prose">
+    <p>Diez pantallas, cada una con contenido distinto según el rol. El principio de diseño:
+    un supervisor entra a resolver algo concreto —fichar a alguien que llegó tarde, aprobar un
+    permiso— y debe poder hacerlo en menos de tres toques desde el dashboard.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Pantalla</th><th>Qué muestra según el rol</th><th>Acceso</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Login</strong></td><td>Logo configurable de la empresa, recuperación de contraseña</td><td>Público</td></tr>
+        <tr><td><strong>Dashboard</strong></td>
+          <td>Gerente: costo laboral consolidado, pasivo por prestaciones, nóminas por aprobar, rotación.<br>
+          Supervisor: asistencia de hoy en su tienda, pendientes de aprobación, vacaciones próximas.<br>
+          Empleado: su último recibo, sus días de vacaciones, sus solicitudes.</td>
+          <td>Todos</td></tr>
+        <tr><td><strong>Empleados</strong></td><td>Ficha completa, historial salarial, documentos, línea de tiempo de incidencias</td><td>Todos (alcance por rol)</td></tr>
+        <tr><td><strong>Asistencia</strong></td><td>Marcaje del día, calendario mensual, corrección de marcajes con justificación obligatoria</td><td>Todos</td></tr>
+        <tr><td><strong>Incidencias</strong></td><td>Bandeja de pendientes, solicitud de permiso, carga de reposo médico</td><td>Todos</td></tr>
+        <tr><td><strong>Nómina</strong></td><td>Asistente de 4 pasos: periodo → precálculo → revisión por tienda → aprobación</td><td>Gerente</td></tr>
+        <tr><td><strong>Recibos</strong></td><td>Vista previa, generación masiva, envío por correo, acuse de lectura</td><td>Gerente · Empleado</td></tr>
+        <tr><td><strong>Reportes</strong></td><td>Costo por tienda, ausentismo, rotación, pasivo laboral, planillas IVSS/FAOV/INCES</td><td>Gerente · Supervisor</td></tr>
+        <tr><td><strong>Configuración</strong></td><td>Empresa, tiendas, conceptos, parámetros legales con su gaceta, tasas BCV</td><td>Gerente</td></tr>
+        <tr><td><strong>Auditoría</strong></td><td>Quién cambió qué y cuándo, con el antes y el después</td><td>Gerente</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>El recibo de pago</h3>
+  <div class="prose">
+    <p>Se genera desde la vista <code>v_recibo_pago</code>, que trae todo lo necesario en una sola
+    consulta. Cada monto en dólares muestra su equivalente en bolívares a la tasa del periodo,
+    congelada al calcular:</p>
+  </div>
+
+  <div class="receipt">
+    <div class="rhead">
+      <strong>INVERSIONES MODA NACIONAL, C.A.</strong>
+      <span>RIF: J-40123456-7 · Av. Francisco de Miranda, Chacao, Caracas</span><br>
+      <span>+58 212-555-0100 · rrhh@modanacional.com.ve</span>
+    </div>
+    <div class="rsec" style="text-align:center">
+      <div class="rlab" style="margin-bottom:4px">Recibo de pago</div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px">N.º 0001-2026-000418</span>
+    </div>
+    <div class="rsec">
+      <div class="rline"><span>Empleado</span><span>María Rodríguez</span></div>
+      <div class="rline"><span>C.I.</span><span>V-18.456.789</span></div>
+      <div class="rline"><span>Cargo</span><span>Vendedora</span></div>
+      <div class="rline"><span>Tienda</span><span>T001 — Sambil Chacao</span></div>
+      <div class="rline"><span>Periodo</span><span>16/08/2026 – 31/08/2026</span></div>
+      <div class="rline"><span>Tasa BCV</span><span>Bs. 250,0000/USD</span></div>
+    </div>
+    <div class="rsec">
+      <div class="rlab">Asignaciones</div>
+      <div class="rline"><span>Salario base · 15 días</span><span>25.000,00</span></div>
+      <div class="rline"><span>Horas extra diurnas · 4 h</span><span>1.250,00</span></div>
+      <div class="rline"><span>Cestaticket · USD 40,00</span><span>10.000,00</span></div>
+      <div class="rline"><span>Bono de guerra · USD 160,00</span><span>40.000,00</span></div>
+      <div class="rline rtot"><span>Total asignaciones</span><span>76.250,00</span></div>
+    </div>
+    <div class="rsec">
+      <div class="rlab">Deducciones</div>
+      <div class="rline"><span>IVSS · 4 %</span><span>12,00</span></div>
+      <div class="rline"><span>RPE Paro Forzoso · 0,5 %</span><span>1,50</span></div>
+      <div class="rline"><span>FAOV · 1 %</span><span>250,00</span></div>
+      <div class="rline rtot"><span>Total deducciones</span><span>263,50</span></div>
+    </div>
+    <div class="rsec rnet">
+      <div class="rline"><span>Neto a pagar</span><span>Bs. 75.986,50</span></div>
+      <div class="rline" style="font-weight:400;font-size:12px;color:var(--ink-3)"><span>Equivalente</span><span>USD 303,95</span></div>
+    </div>
+  </div>
+  <p class="footnote">Cifras del caso de prueba ejecutado en la sección 5. El PDF se firma con
+  SHA-256 y se guarda en el bucket privado <code>recibos</code>; el empleado accede por URL firmada
+  de vigencia corta.</p>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <div class="sechead"><span class="num">08</span><h2>Flujos de trabajo</h2></div>
+
+  <h3>Cierre de nómina quincenal</h3>
+  <div class="prose">
+    <ol>
+      <li><strong>Corte de asistencia.</strong> El supervisor cierra el periodo de su tienda. Marcajes
+      incompletos y ausencias sin justificar quedan bloqueando el paso siguiente hasta resolverse.</li>
+      <li><strong>Aprobación de pendientes.</strong> Horas extra e incidencias en estado
+      <em>pendiente</em> se aprueban o rechazan. Lo no aprobado no entra en el cálculo.</li>
+      <li><strong>Cálculo.</strong> El gerente dispara <code>calcular-nomina</code>. La función
+      congela la tasa BCV del día, lee los parámetros vigentes a la fecha de pago y escribe las líneas
+      con su trazabilidad. La nómina queda en estado <em>calculada</em>.</li>
+      <li><strong>Revisión por tienda.</strong> Cada supervisor revisa la suya. Solo ve la de su tienda.</li>
+      <li><strong>Aprobación.</strong> El gerente general aprueba. El trigger sella la nómina:
+      desde ese momento el detalle es inmutable y cualquier corrección exige una nómina de ajuste
+      retroactivo enlazada a la original.</li>
+      <li><strong>Recibos y pago.</strong> Se generan los PDF, se envían por correo y se exporta el
+      archivo de pago para el banco.</li>
+    </ol>
+
+    <h3>Cierre trimestral de prestaciones</h3>
+    <p>Un cron de Supabase ejecuta <code>cierre-trimestral</code> el último día de marzo, junio,
+    septiembre y diciembre. Para cada empleado activo abona 15 días al salario integral <em>de ese
+    trimestre</em>, agrega los días adicionales cuando corresponde al aniversario, y capitaliza los
+    intereses a la tasa activa del BCV. El saldo se actualiza por trigger; nunca se escribe a mano.</p>
+
+    <h3>Liquidación</h3>
+    <p><code>rrhh.calcular_liquidacion()</code> devuelve un JSON con cada renglón desglosado:
+    garantía acumulada, retroactivo de 30 días por año, cuál de los dos se paga, intereses,
+    vacaciones vencidas y fraccionadas, bono vacacional, utilidades fraccionadas e indemnización del
+    artículo 92 cuando el motivo es despido injustificado. El simulador usa la misma función que la
+    liquidación real, de modo que lo que se le muestra al trabajador antes de firmar es exactamente
+    lo que se le va a pagar.</p>
+
+    <h3>Actualización de la tasa BCV</h3>
+    <p><code>sync-bcv</code> corre cada día hábil, inserta la tasa en <code>tasas_cambio</code> y
+    emite un evento Realtime que refresca los montos en pantalla. Si la fuente no responde, la función
+    no inventa un valor: registra el fallo y notifica al gerente. Cualquier cálculo que necesite esa
+    tasa fallará con un mensaje claro en lugar de producir cifras en cero.</p>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <div class="sechead"><span class="num">09</span><h2>Cronograma de desarrollo</h2></div>
+  <div class="prose">
+    <p>22 semanas con un equipo de tres: un desarrollador full-stack senior, uno semi-senior y un
+    analista de nómina a medio tiempo para validar cálculos. El analista no es opcional: es quien
+    detecta que un cálculo correcto en el papel no corresponde a cómo la empresa realmente paga.</p>
+  </div>
+
+  <div class="phases">
+    <div class="phase"><div class="wk">S 1–2</div><div>
+      <h5>Fundaciones</h5>
+      <p>Proyectos de Supabase (dev, staging, prod), repositorio y CI, migraciones base, seed de las
+      20 tiendas y de los parámetros legales verificados contra Gaceta Oficial, autenticación y guards por rol.</p></div></div>
+    <div class="phase"><div class="wk">S 3–5</div><div>
+      <h5>Empleados y configuración</h5>
+      <p>CRUD completo, historial salarial, documentos en Storage, pantalla de parámetros legales,
+      catálogo de conceptos, tiendas y cargos. Primer conjunto de políticas RLS con sus pruebas.</p></div></div>
+    <div class="phase"><div class="wk">S 6–8</div><div>
+      <h5>Asistencia e incidencias</h5>
+      <p>Marcaje con soporte sin conexión, consolidación diaria, horarios, calendario, horas extra con
+      sus topes, bandeja de aprobaciones y flujo de permisos y reposos.</p></div></div>
+    <div class="phase"><div class="wk">S 9–13</div><div>
+      <h5>Motor de nómina</h5>
+      <p>La fase crítica. Edge Function de cálculo, todos los conceptos, retenciones, aportes
+      patronales, asistente de cierre y aprobación. Validación paralela contra tres quincenas
+      reales ya pagadas por la empresa: si no cuadran al bolívar, no se avanza.</p></div></div>
+    <div class="phase"><div class="wk">S 14–15</div><div>
+      <h5>Recibos</h5>
+      <p>Plantilla configurable, generación de PDF, correlativo, firma SHA-256, envío por correo y
+      acuse de lectura del trabajador.</p></div></div>
+    <div class="phase"><div class="wk">S 16–18</div><div>
+      <h5>Prestaciones, vacaciones y utilidades</h5>
+      <p>Cierre trimestral, intereses, anticipos con su tope, control de vacaciones, utilidades
+      anuales, calculadora de prestaciones y simulador de liquidaciones.</p></div></div>
+    <div class="phase"><div class="wk">S 19–20</div><div>
+      <h5>Reportes y módulo legal</h5>
+      <p>Vistas materializadas, exportación a PDF y Excel, archivo TIUNA para el IVSS, planillas FAOV
+      e INCES, formatos de contrato y cartas de amonestación.</p></div></div>
+    <div class="phase"><div class="wk">S 21–22</div><div>
+      <h5>Piloto y despliegue</h5>
+      <p>Piloto en 2 tiendas durante una quincena completa en paralelo con el método actual.
+      Migración de datos históricos, capacitación por rol, manuales y salida a producción escalonada
+      por regiones.</p></div></div>
+  </div>
+
+  <div class="callout">
+    <span class="chip">El hito que decide el proyecto</span>
+    <p>Semana 13: la nómina calculada por el sistema debe coincidir al bolívar con tres quincenas ya
+    pagadas por la empresa. Si no coincide, la diferencia revela un supuesto equivocado —casi siempre
+    sobre qué se considera salario— y corregirlo ahí cuesta días; descubrirlo en producción cuesta
+    la confianza de 20 tiendas.</p>
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <div class="sechead"><span class="num">10</span><h2>Recomendaciones</h2></div>
+  <div class="prose">
+    <h4>Antes de escribir una línea de frontend</h4>
+    <p>Verifique cada valor del <em>seed</em> contra su Gaceta Oficial y el criterio de su abogado
+    laboral. Los montos cargados son de referencia y llevan advertencia en el propio archivo.
+    El cestaticket y el bono de guerra en particular cambian con frecuencia y sus anuncios no siempre
+    aclaran si aplican al sector privado.</p>
+
+    <h4>Defina la política de incidencia salarial por escrito</h4>
+    <p>Qué porción del paquete es salario y qué porción es bonificación no salarial es la decisión más
+    cara del sistema. Documéntela, féchela, guárdela junto a los parámetros y revísela con su abogado
+    cada vez que cambie la estructura de pago. El sistema ejecutará fielmente lo que se configure —
+    incluida una configuración que genere pasivos.</p>
+
+    <h4>Corra el pasivo laboral como un indicador mensual</h4>
+    <p><code>v_pasivo_laboral</code> muestra, por tienda y en ambas monedas, lo que la empresa debería
+    tener provisionado. Póngalo en el dashboard del gerente desde el primer día, no como un reporte
+    que alguien consulta al cerrar el año.</p>
+
+    <h4>Empiece por dos tiendas, no por veinte</h4>
+    <p>Un piloto de una quincena completa en dos tiendas, corriendo en paralelo con el método actual,
+    revela en dos semanas lo que un despliegue total revelaría en dos meses de crisis. Elija una
+    tienda grande y una pequeña: los problemas son distintos.</p>
+
+    <h4>Migre solo lo que necesita</h4>
+    <p>De los históricos, lo indispensable es: fecha de ingreso, historial salarial, saldo de
+    prestaciones y periodos de vacaciones pendientes. El resto puede quedar en el sistema anterior
+    como archivo. Migrar años de marcajes retrasa el arranque y casi nunca se consulta.</p>
+
+    <h4>Dos cosas que este diseño deliberadamente no hace</h4>
+    <p>No integra directamente con el sistema TIUNA del IVSS —genera el archivo para carga manual,
+    porque la interfaz del organismo cambia sin aviso y una integración automática se rompería—. Y no
+    calcula la retención de ISLR desde cero: aplica el porcentaje del AR-I que declara cada trabajador,
+    que es como funciona el mecanismo. La tabla de tramos está cargada para el simulador y para
+    validar los porcentajes declarados.</p>
+
+    <h4>Sobre el bloqueo por falta de tasa</h4>
+    <p>Que el sistema se detenga cuando falta la tasa BCV va a incomodar el primer día que ocurra.
+    Es intencional. El escenario alternativo —recibos emitidos con montos en cero o con la tasa de
+    la semana pasada— es mucho peor y mucho más difícil de detectar a tiempo.</p>
+  </div>
+</section>
+
+<div class="srcs">
+  <h4>Fuentes consultadas para los parámetros de 2026</h4>
+  <ul>
+    <li><a href="https://www.infobae.com/venezuela/2026/05/05/venezuela-aplaza-de-nuevo-la-reforma-salarial-el-aumento-a-240-dolares-ira-en-bonos-no-en-salario/">Venezuela aplaza de nuevo la reforma salarial: el aumento a 240 dólares irá en bonos, no en salario — Infobae</a></li>
+    <li><a href="https://www.nompli.com/blog/unidad-tributaria-seniat-2026-valor-vigente">Unidad Tributaria SENIAT 2026: valor vigente — Nompli</a></li>
+    <li><a href="https://accesoalajusticia.org/reajustado-el-valor-de-la-unidad-tributaria-u-t-a-bs-4300/">Reajustado el valor de la Unidad Tributaria a Bs. 43,00 — Acceso a la Justicia</a></li>
+    <li><a href="https://www.g-talent.net/blogs/finanzas-administracion/salario-minimo-venezuela-2026-ingreso-integral-cestaticket">Salario mínimo en Venezuela 2026: ingreso mínimo integral y cestaticket — G-Talent</a></li>
+    <li><a href="https://finanzasdigital.com/pago-retroactivo-bono-incremento-integral-2026-ajuste-salarial/">Sin aumento salarial: el ajuste se concentra en el bono de Guerra Económica — Finanzas Digital</a></li>
+  </ul>
+  <p class="footnote">Este documento describe una arquitectura de software. No sustituye la asesoría
+  de un abogado laboral venezolano, y los parámetros cargados deben validarse contra Gaceta Oficial
+  antes de usarse en producción.</p>
+</div>
+
+</main>
+</div>
+</div>
