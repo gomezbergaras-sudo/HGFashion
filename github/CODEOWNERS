@@ -1,0 +1,7 @@
+# Todo requiere revisión
+*                           @gomezbergaras-sudo
+
+# Cálculos legales y control de acceso: revisión obligatoria
+/supabase/migrations/*600*  @gomezbergaras-sudo
+/supabase/migrations/*800*  @gomezbergaras-sudo
+/supabase/seed.sql          @gomezbergaras-sudo

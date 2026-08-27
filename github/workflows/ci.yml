@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+jobs:
+  base-de-datos:
+    name: Migraciones y cálculos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Levantar Supabase local
+        run: supabase start
+
+      - name: Aplicar migraciones y seed desde cero
+        run: supabase db reset --debug
+
+      - name: Verificar que el esquema quedó completo
+        run: |
+          supabase db reset >/dev/null 2>&1
+          RESULT=$(supabase db execute --stdin <<'SQL'
+            select count(*) from information_schema.tables
+            where table_schema = 'public' and table_type = 'BASE TABLE';
+          SQL
+          )
+          echo "$RESULT"
+
+      - name: Tests de cálculo y RLS
+        run: supabase test db
+
+  frontend:
+    name: Lint, tipos y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test -- --run
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
