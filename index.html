@@ -1,3 +1,9 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A7C88" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131F22" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Sistema de Recursos Humanos y Nómina de HG Fashion Boutique">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HG Fashion">
 <title>HG Fashion · Nómina</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
@@ -375,11 +381,121 @@ textarea{width:100%;min-height:130px;padding:11px 13px;border:1px solid var(--li
 .tipo-sw button.on{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
 </style>
 
+<style>
+/* =====================================================================
+   TELÉFONO Y TABLET
+   El menú lateral pasa a ser un panel que entra desde la izquierda,
+   las tablas se vuelven fichas apiladas y los modales ocupan la pantalla.
+   ===================================================================== */
+.hamb{display:none;width:38px;height:38px;border-radius:8px;align-items:center;
+  justify-content:center;font-size:19px;color:var(--ink-2);flex-shrink:0}
+.hamb:hover{background:var(--sunken)}
+.velo{display:none;position:fixed;inset:0;background:rgba(19,34,39,.42);z-index:59}
+.velo.on{display:block}
+
+@media(max-width:1024px){
+  #app.on{grid-template-columns:190px 1fr}
+  .wrap{padding:20px 18px 60px}
+  header.top{padding:0 18px}
+}
+
+@media(max-width:820px){
+  #app.on{grid-template-columns:1fr}
+  aside{position:fixed;top:0;left:0;bottom:0;width:250px;z-index:60;
+    transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
+    flex-direction:column;height:100vh;overflow-y:auto;box-shadow:0 0 40px rgba(0,0,0,.18)}
+  aside.abierto{transform:translateX(0)}
+  aside .brandrow{border-bottom:1px solid var(--line-2);border-right:0}
+  nav{display:block;padding:12px 10px}
+  .navgrp,.userbox{display:block}
+  .navitem{margin-bottom:2px;padding:10px 12px;font-size:15px}
+  .hamb{display:flex}
+
+  header.top{padding:0 14px;gap:10px;height:54px;position:sticky}
+  header.top h1{font-size:17px;flex:1;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  header.top .spacer{display:none}
+  header.top .chip{display:none}
+  header.top .chip#scopechip{display:inline-flex;max-width:44vw;overflow:hidden}
+  header.top #scopechip span{display:none}
+
+  .wrap{padding:16px 14px 70px}
+  .grid.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .tile{padding:13px 14px}
+  .tile .val{font-size:25px}
+  .tile .lab{font-size:9.5px;letter-spacing:.1em}
+  .tile .meta{font-size:11.5px}
+
+  .grid[style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+  .toolbar{gap:8px}
+  .search{max-width:none;flex:1 1 100%}
+  select.filtro{flex:1 1 45%;min-width:0}
+  .toolbar .btn{flex:1 1 auto}
+  .toolbar .spacer{display:none}
+
+  .modal-bg{padding:0;align-items:stretch}
+  .modal,.modal.wide{max-width:none;border-radius:0;min-height:100vh;
+    display:flex;flex-direction:column}
+  .modal-h{position:sticky;top:0;background:var(--surface);z-index:2}
+  .modal-b{flex:1;overflow-y:auto}
+  .modal-f{position:sticky;bottom:0;background:var(--surface);
+    box-shadow:0 -4px 12px -8px rgba(0,0,0,.25)}
+  .modal-f .btn{flex:1}
+  .frow{grid-template-columns:1fr}
+
+  .steps{flex-direction:column}
+  .step{border-right:0;border-bottom:1px solid var(--line-2);min-width:0}
+  .step:last-child{border-bottom:0}
+  .tabs{gap:0}
+  .tab{padding:9px 12px;font-size:13.5px}
+  .recibo{max-width:none}
+  .reciboLista{grid-template-columns:repeat(auto-fill,minmax(0,1fr))}
+
+  /* Tablas como fichas: cada fila se lee de arriba abajo */
+  table.fichas{min-width:0}
+  table.fichas thead{display:none}
+  table.fichas,table.fichas tbody,table.fichas tr,table.fichas td{display:block;width:100%}
+  table.fichas tr{border:1px solid var(--line);border-radius:8px;margin-bottom:10px;
+    padding:12px 14px;background:var(--surface)}
+  table.fichas tr:last-child{margin-bottom:0}
+  table.fichas td{border:0;padding:3px 0;display:flex;justify-content:space-between;
+    align-items:center;gap:14px;text-align:right}
+  table.fichas td::before{content:attr(data-et);flex-shrink:0;text-align:left;
+    font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+    font-weight:700}
+  table.fichas td:first-child{display:block;text-align:left;padding-bottom:9px;
+    margin-bottom:7px;border-bottom:1px solid var(--line-2)}
+  table.fichas td:first-child::before{display:none}
+  table.fichas td.num{justify-content:space-between}
+  table.fichas td:empty{display:none}
+  .tbl-wrap{overflow:visible;border:0;background:none;box-shadow:none}
+  .rowact{justify-content:flex-start;margin-top:8px}
+  .iconbtn{width:36px;height:36px;border:1px solid var(--line)}
+}
+
+@media(max-width:359px){
+  .grid.tiles{grid-template-columns:1fr}
+}
+@media(max-width:420px){
+  .wrap{padding:14px 12px 70px}
+  .tile .val{font-size:23px}
+  .tile{padding:11px 12px}
+  .toolbar .btn{flex:1 1 100%}
+}
+
+/* Pantallas táctiles: objetivos más grandes */
+@media(hover:none){
+  .navitem,.tab,.btn{min-height:40px}
+  .rcard{padding:16px}
+}
+</style>
+
 <div id="login"></div>
 <div id="toast"></div>
 <div id="printzone"></div>
 <div id="modalhost"></div>
 
+<div class="velo" id="velo" onclick="cerrarMenu()"></div>
 <div id="app">
   <aside>
     <div class="brandrow"><div class="logo">
@@ -390,6 +506,7 @@ textarea{width:100%;min-height:130px;padding:11px 13px;border:1px solid var(--li
   </aside>
   <main>
     <header class="top">
+      <button class="hamb" onclick="alternarMenu()" aria-label="Menú">☰</button>
       <h1 id="ptitle">Panel</h1>
       <div class="spacer"></div>
       <div class="chip"><span class="dot"></span>BCV <b>Bs. 250,00</b></div>
@@ -1424,59 +1541,113 @@ function formUsuario(id){
   tiendaSegunRol();
 }
 function invitarUsuario(){
+  const claveSugerida = 'HG' + Math.random().toString(36).slice(2,8) + Math.floor(Math.random()*90+10);
   modal(`<div class="modal"><div class="modal-h">
-      <h3>Invitar a alguien al sistema</h3><button class="x" onclick="cerrarModal()">×</button></div>
+      <h3>Crear usuario</h3><button class="x" onclick="cerrarModal()">×</button></div>
     <div class="modal-b">
-      <div class="note in" style="margin-bottom:18px"><span class="ni">◔</span><div>
-        Las invitaciones se envían desde el panel de Supabase, que es quien maneja los correos
-        y las contraseñas. Aquí abajo tienes los datos exactos que hay que pegar.</div></div>
       <div class="frow">
-        <div><label>Nombre y apellido</label><input id="i_n" placeholder="Michel Salazar" oninput="previaInvitacion()"></div>
-        <div><label>Correo</label><input id="i_email" type="email" placeholder="m.salazar@hgfashion.com.ve" oninput="previaInvitacion()"></div>
+        <div><label>Nombre y apellido</label><input id="i_n" placeholder="Michel Salazar"></div>
+        <div><label>Correo</label><input id="i_email" type="email" placeholder="m.salazar@hgfashion.com.ve">
+          <p class="hintx">Con este correo entrará al sistema.</p></div>
       </div>
       <div class="frow">
-        <div><label>Rol</label><select id="i_rol" onchange="previaInvitacion()">
-          ${Object.entries(ROL_ET).map(([kk,v])=>`<option value="${kk}">${v}</option>`).join('')}
+        <div><label>Rol</label><select id="i_rol" onchange="tiendaSegunRolNuevo()">
+          <option value="supervisor_tienda">Supervisor de Tienda</option>
+          <option value="supervisor_auxiliar">Supervisor Auxiliar</option>
+          <option value="empleado">Empleado</option>
+          <option value="gerente_general">Gerente General</option>
         </select></div>
-        <div><label>Tienda</label><select id="i_t" onchange="previaInvitacion()">
-          <option value="">— Todas —</option>${opcTiendas(FILTRO.tienda||'')}</select></div>
+        <div><label>Tienda</label><select id="i_t">
+          <option value="">— Todas —</option>${opcTiendas(FILTRO.tienda||'')}</select>
+          <p class="hintx" id="i_hint">Solo verá los datos de esta tienda.</p></div>
       </div>
       <div class="frow one"><div><label>Vincular con un empleado (opcional)</label>
-        <select id="i_ci" onchange="previaInvitacion()"><option value="">— Ninguno —</option>
+        <select id="i_ci"><option value="">— Ninguno —</option>
           ${ESTADO.empleados.filter(e=>!e.usuario_id).map(e=>
             `<option value="${esc(e.ci)}">${esc(e.n)} · V-${esc(e.ci)} · ${esc(e.t)}</option>`).join('')}
-        </select></div></div>
-
-      <div style="margin-top:20px">
-        <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin-bottom:10px">
-          Pasos en Supabase</div>
-        <ol style="font-size:13.5px;padding-left:20px;line-height:1.7;color:var(--ink-2)">
-          <li>Entra a <b>Authentication → Users → Add user → Send invitation</b></li>
-          <li>Pega el correo de arriba</li>
-          <li>En <b>User Metadata</b> pega exactamente esto:</li>
-        </ol>
-        <textarea id="i_json" readonly style="min-height:96px;margin-top:8px"></textarea>
-        <button class="btn ghost sm" style="margin-top:8px" onclick="copiarJSON()">Copiar</button>
-        <p class="hintx">Al aceptar la invitación, el perfil con ese rol y esa tienda
-          se crea solo. Después aparecerá en esta lista.</p>
+        </select>
+        <p class="hintx">Vincularlo le permite ver su propio recibo y sus vacaciones.</p></div>
       </div>
+      <div class="frow one"><div><label>Contraseña temporal</label>
+        <input id="i_pass" value="${claveSugerida}">
+        <p class="hintx">Entrégasela a la persona. Podrá cambiarla desde
+          «Olvidé mi contraseña» en la pantalla de entrada.</p></div>
+      </div>
+      <div class="note in"><span class="ni">◔</span><div>
+        La cuenta se crea directamente en Supabase con el rol y la tienda que elijas.
+        Si tu proyecto exige confirmar el correo, la persona recibirá un mensaje
+        antes de poder entrar.</div></div>
     </div>
-    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cerrar</button>
-      <button class="btn sm" style="width:auto" onclick="cerrarModal();recargar()">Ya invité · recargar</button>
+    <div class="modal-f">
+      <button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btncrearu" style="width:auto" onclick="crearUsuario()">Crear usuario</button>
     </div></div>`);
-  previaInvitacion();
+  tiendaSegunRolNuevo();
 }
-function previaInvitacion(){
+function tiendaSegunRolNuevo(){
+  const rol=document.getElementById('i_rol'), sel=document.getElementById('i_t'),
+        h=document.getElementById('i_hint');
+  if(!rol||!sel) return;
+  const global = rol.value==='gerente_general';
+  sel.disabled=global; sel.style.opacity=global?.5:1;
+  if(global) sel.value='';
+  if(h) h.textContent = global ? 'El gerente general ve todas las tiendas.'
+                               : 'Solo verá los datos de esta tienda.';
+}
+async function crearUsuario(){
   const g=k=>{const el=document.getElementById('i_'+k); return el?el.value.trim():''};
-  const o={nombre:g('n')||'Nombre Apellido', rol:g('rol')};
-  if(g('rol')!=='gerente_general' && g('t')) o.tienda=g('t');
-  if(g('ci')) o.cedula=g('ci');
-  const ta=document.getElementById('i_json'); if(ta) ta.value=JSON.stringify(o,null,2);
+  if(!g('n')) return aviso('Falta el nombre');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g('email'))) return aviso('El correo no es válido');
+  if(g('pass').length<6) return aviso('La contraseña temporal necesita al menos 6 caracteres');
+  const rol=g('rol');
+  if(rol!=='gerente_general' && !g('t')) return aviso('Asigna una tienda a este usuario');
+
+  const b=document.getElementById('btncrearu'); b.disabled=true; b.textContent='Creando…';
+  try{
+    // Cliente aparte y sin guardar sesión: así crear a otro no cierra la tuya
+    const cli = window.supabase.createClient(CFG.url, CFG.key,
+      {auth:{persistSession:false, autoRefreshToken:false, detectSessionInUrl:false}});
+    const meta = {nombre:g('n'), rol};
+    if(rol!=='gerente_general') meta.tienda = g('t');
+    if(g('ci')) meta.cedula = g('ci');
+
+    const { data, error } = await cli.auth.signUp({
+      email:g('email'), password:g('pass'), options:{ data: meta }});
+    if(error) throw error;
+
+    // Supabase no delata correos existentes con un error: devuelve el usuario
+    // sin identidades. Ese es el indicio de que la cuenta ya estaba creada.
+    if(data.user && Array.isArray(data.user.identities) && data.user.identities.length===0){
+      b.disabled=false; b.textContent='Crear usuario';
+      return aviso('Ese correo ya tiene una cuenta en el sistema');
+    }
+
+    cerrarModal();
+    aviso(`Usuario creado · entrega la clave ${g('pass')} a ${g('n')}`);
+    await cargarTodo();
+    if(!ESTADO.usuarios.some(u=>u.email===g('email').toLowerCase())){
+      modal(`<div class="modal" style="max-width:520px"><div class="modal-h">
+          <h3>Cuenta creada · falta confirmar el correo</h3>
+          <button class="x" onclick="cerrarModal()">×</button></div>
+        <div class="modal-b">
+          <p>La cuenta de <b>${esc(g('n'))}</b> quedó creada, pero todavía no aparece
+            en la lista porque tu proyecto exige <b>confirmar el correo</b>.</p>
+          <p style="margin-top:12px">La persona debe abrir el mensaje que le llegó y hacer
+            clic en el enlace. Aparecerá aquí en cuanto lo haga.</p>
+          <div class="note wa" style="margin-top:14px"><span class="ni">⚑</span><div>
+            Si prefieres que entren sin confirmar, desactívalo en Supabase:
+            <b>Authentication → Sign In / Providers → Email → Confirm email</b>.</div></div>
+        </div>
+        <div class="modal-f"><button class="btn sm" style="width:auto"
+          onclick="cerrarModal()">Entendido</button></div></div>`);
+    }
+    pintar();
+  }catch(e){
+    b.disabled=false; b.textContent='Crear usuario';
+    aviso(explicar(e));
+  }
 }
-function copiarJSON(){
-  const ta=document.getElementById('i_json'); ta.select();
-  navigator.clipboard.writeText(ta.value).then(()=>aviso('Copiado'),()=>aviso('Selecciona y copia manualmente'));
-}
+
 function tiendaSegunRol(){
   const rol=document.getElementById('u_rol'), sel=document.getElementById('u_t'),
         h=document.getElementById('u_hint');
@@ -2395,8 +2566,32 @@ const MENU = {
           ['prestaciones','Mis prestaciones','◈']],
 };
 
+function alternarMenu(){
+  const a=document.querySelector('aside'), v=document.getElementById('velo');
+  const abierto=a.classList.toggle('abierto');
+  v.classList.toggle('on',abierto);
+  document.body.style.overflow=abierto?'hidden':'';
+}
+function cerrarMenu(){
+  document.querySelector('aside').classList.remove('abierto');
+  document.getElementById('velo').classList.remove('on');
+  document.body.style.overflow='';
+}
 function ir(v){ if(!(MENU[ROL()]||[]).some(m=>m[0]===v)) return;
-  VISTA=v; FILTRO.texto=''; pintar(); window.scrollTo(0,0); }
+  VISTA=v; FILTRO.texto=''; cerrarMenu(); pintar(); window.scrollTo(0,0); }
+
+/* En pantallas estrechas cada fila se lee como ficha: para eso cada celda
+   necesita saber a qué columna pertenece. */
+function tablasComoFichas(){
+  document.querySelectorAll('#view table').forEach(t=>{
+    const cab=[...t.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    if(!cab.length) return;
+    t.classList.add('fichas');
+    t.querySelectorAll('tbody tr').forEach(tr=>{
+      [...tr.children].forEach((td,i)=>{ if(cab[i]) td.setAttribute('data-et',cab[i]); });
+    });
+  });
+}
 
 function pintar(){
   if(!SESION) return;
@@ -2423,5 +2618,6 @@ function pintar(){
   document.getElementById('view').innerHTML = CARGANDO
     ? '<div class="empty"><b>Cargando…</b>Consultando la base de datos.</div>'
     : V.h();
+  tablasComoFichas();
 }
 </script>
