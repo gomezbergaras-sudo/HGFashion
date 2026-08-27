@@ -560,7 +560,7 @@ const uid = (()=>{let n=1000;return ()=>'tmp'+(++n)})();
 const ESTADO = {
  empresa:null, tiendas:[], empleados:[], cargos:[], usuarios:[],
  asistencia:{}, marcajes:[], incidencias:[], nominaAprobada:false,
- param:[], auditoria:[],
+ param:[], paramRaw:[], conceptos:[], tasas:[], auditoria:[],
 };
 
 const ROL_ET = {gerente_general:'Gerente General', supervisor_tienda:'Supervisor de Tienda',
@@ -660,7 +660,7 @@ function auditar(){}   /* la auditoría real la escriben los triggers de la base
 
 async function cargarTodo(){
   CARGANDO=true; pintar();
-  const [emp, tie, car, emps, sal, usr, par] = await Promise.all([
+  const [emp, tie, car, emps, sal, usr, par, con, tas] = await Promise.all([
     sb.from('empresas').select('*').limit(1).maybeSingle(),
     sb.from('tiendas').select('*').order('codigo'),
     sb.from('cargos').select('*').order('nombre'),
@@ -668,14 +668,19 @@ async function cargarTodo(){
     sb.from('historial_salarios').select('empleado_id,salario_base,moneda_salario,vigente_desde,vigente_hasta'),
     sb.from('v_usuarios').select('*'),
     sb.from('parametros_legales').select('*').is('vigente_hasta',null).order('clave'),
+    sb.from('conceptos_nomina').select('*').order('orden'),
+    sb.from('tasas_cambio').select('*').order('fecha',{ascending:false}).limit(60),
   ]);
 
   ESTADO.empresa  = emp.data || null;
   ESTADO.tiendas  = tie.data || [];
   ESTADO.cargos   = car.data || [];
   ESTADO.usuarios = usr.data || [];
+  ESTADO.paramRaw = par.data || [];
   ESTADO.param    = (par.data||[]).map(p=>[p.descripcion, formatoParam(p), p.vigente_desde,
                      [p.gaceta_oficial,p.fundamento].filter(Boolean).join(' · ')]);
+  ESTADO.conceptos= con.data || [];
+  ESTADO.tasas    = tas.data || [];
 
   // Salario vigente por empleado
   const salPor = {};
@@ -837,6 +842,78 @@ async function activarUsuario(id, activo){
   if(r!==null){ const u=ESTADO.usuarios.find(x=>x.id===id); if(u) u.activo=activo;
     aviso(activo?'Usuario reactivado':'Usuario desactivado'); }
   return r;
+}
+
+/* ---------- EMPRESA ---------- */
+async function guardarEmpresa(d){
+  const r = await conError(()=>sb.from('empresas').update(d)
+    .eq('id',ESTADO.empresa.id).select().single(), 'Datos de la empresa guardados');
+  if(r) ESTADO.empresa = r;
+  return r;
+}
+
+/* ---------- PARÁMETROS LEGALES ---------- */
+async function nuevaVigencia(d){
+  // No se actualiza el valor anterior: se inserta la vigencia nueva y un
+  // trigger de la base cierra la anterior con su fecha.
+  const r = await conError(()=>sb.from('parametros_legales').insert({
+    clave:d.clave, descripcion:d.descripcion, valor:d.valor,
+    moneda:d.moneda||null, unidad:d.unidad, vigente_desde:d.desde,
+    gaceta_oficial:d.gaceta||null, fundamento:d.fundamento||null
+  }).select().single(), 'Vigencia cargada · la anterior quedó en el histórico');
+  if(r) await cargarTodo();
+  return r;
+}
+async function historicoParametro(clave){
+  const { data } = await sb.from('parametros_legales').select('*')
+    .eq('clave',clave).order('vigente_desde',{ascending:false});
+  return data || [];
+}
+
+/* ---------- CONCEPTOS DE NÓMINA ---------- */
+async function guardarConcepto(id,d){
+  const r = await conError(()=>sb.from('conceptos_nomina').update(d)
+    .eq('id',id).select().single(), 'Concepto actualizado');
+  if(r) Object.assign(ESTADO.conceptos.find(c=>c.id===id), r);
+  return r;
+}
+async function crearConcepto(d){
+  const r = await conError(()=>sb.from('conceptos_nomina').insert({
+    empresa_id:ESTADO.empresa.id, ...d}).select().single(), 'Concepto creado');
+  if(r) ESTADO.conceptos.push(r);
+  return r;
+}
+
+/* ---------- TASAS BCV ---------- */
+async function guardarTasa(fecha, tasa, origen){
+  const r = await conError(()=>sb.from('tasas_cambio')
+    .upsert({fecha, tasa_usd:tasa, origen}, {onConflict:'fecha'})
+    .select().single(), 'Tasa registrada');
+  if(r){ ESTADO.tasas = ESTADO.tasas.filter(t=>t.fecha!==fecha);
+         ESTADO.tasas.unshift(r);
+         ESTADO.tasas.sort((a,b)=>b.fecha.localeCompare(a.fecha)); }
+  return r;
+}
+
+/* ---------- PRESTACIONES Y LIQUIDACIONES ---------- */
+async function pedirSaldo(empleadoId){
+  const { data, error } = await sb.rpc('saldo_prestaciones',{p_empleado:empleadoId});
+  if(error){ aviso(explicar(error)); return null; }
+  return data;
+}
+async function pedirLiquidacion(empleadoId, fecha, motivo){
+  const { data, error } = await sb.rpc('simular_liquidacion',
+    {p_empleado:empleadoId, p_fecha_egreso:fecha, p_motivo:motivo});
+  if(error){ aviso(explicar(error)); return null; }
+  return data;
+}
+async function pedirPasivo(tiendaCod){
+  const { data, error } = await sb.rpc('pasivo_laboral',{p_tienda_codigo:tiendaCod||null});
+  if(error) return null;
+  return data;
+}
+async function cerrarTrimestreRPC(anio, trim){
+  return await conError(()=>sb.rpc('cerrar_trimestre',{p_anio:anio, p_trimestre:trim}));
 }
 </script>
 <script>
@@ -2307,36 +2384,109 @@ recibos:{ t:()=>ROL()==='empleado'?'Mis recibos':'Recibos de pago', h:()=>{
     listo para enviar o archivar.</div></div>`;
 }},
 
-prestaciones:{ t:()=>ROL()==='empleado'?'Mis prestaciones':'Prestaciones sociales', h:()=>`
+prestaciones:{ t:()=>ROL()==='empleado'?'Mis prestaciones':'Prestaciones sociales', h:()=>{
+  const L = empleadosVisibles().filter(e=>e.est!=='egresado');
+  if(!L.length) return `<div class="empty"><b>Sin empleados</b>
+    Carga personal para poder calcular prestaciones.</div>`;
+
+  // El empleado ve lo suyo; los demás eligen a quién consultar
+  if(!PREST.empleado || !L.some(e=>e.id===PREST.empleado)) PREST.empleado = L[0].id;
+  const e = L.find(x=>x.id===PREST.empleado);
+  const s = PREST.saldo, q = PREST.liq;
+
+  return `${ROL()==='empleado'?'':`<div class="toolbar">
+      <select class="filtro" style="min-width:250px" onchange="elegirEmpleadoPrest(this.value)">
+        ${L.map(x=>`<option value="${x.id}" ${x.id===PREST.empleado?'selected':''}>
+          ${esc(x.n)} · ${esc(x.cargo)} · ${esc(x.t)}</option>`).join('')}
+      </select>
+      <div class="spacer"></div>
+      ${esGerente()?`<button class="btn ghost sm" onclick="formTrimestre()">
+        ⊞ Cerrar trimestre</button>`:''}
+      <button class="btn ghost sm" onclick="refrescarPrest()">↻ Recalcular</button>
+    </div>`}
+
   <div class="grid tiles" style="margin-bottom:16px">
-    <div class="tile"><div class="lab">Garantía acumulada</div><div class="val">Bs. 284.028</div>
-      <div class="meta">USD 1.136,11 · art. 142 LOTTT</div></div>
-    <div class="tile"><div class="lab">Días acumulados</div><div class="val">158</div>
+    <div class="tile"><div class="lab">Garantía acumulada</div>
+      <div class="val">${s?'Bs. '+k(s.capital):'—'}</div>
+      <div class="meta">${s?'USD '+bs(s.capital/TASA)+' · art. 142 LOTTT':'Cargando…'}</div></div>
+    <div class="tile"><div class="lab">Días acumulados</div>
+      <div class="val">${s?(+s.dias).toFixed(0):'—'}</div>
       <div class="meta">Trimestrales + días adicionales</div></div>
-    <div class="tile"><div class="lab">Anticipo disponible</div><div class="val">Bs. 213.021</div>
+    <div class="tile"><div class="lab">Anticipo disponible</div>
+      <div class="val">${s?'Bs. '+k(s.anticipo_max):'—'}</div>
       <div class="meta">Hasta el 75 % · art. 144 LOTTT</div></div>
-    <div class="tile"><div class="lab">Antigüedad</div><div class="val">5 <small>años</small></div>
-      <div class="meta">Desde el 01/03/2021</div></div>
+    <div class="tile"><div class="lab">Antigüedad</div>
+      <div class="val">${s?s.anios:anios(e.ing)} <small>años</small></div>
+      <div class="meta">Desde el ${fechaCorta(e.ing)}</div></div>
   </div>
-  <div class="card" style="margin-bottom:16px"><div class="card-h">
-    <h3>Simulador de liquidación</h3><p class="sub">Si el egreso fuera hoy, 27 de agosto de 2026</p>
-    <div class="spacer"></div><button class="btn ghost sm"
-      onclick="noDisponible('Simulador con otros supuestos')">Cambiar supuestos</button></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Concepto</th><th>Fundamento</th><th class="num">Bolívares</th><th class="num">USD</th></tr></thead>
-      <tbody>${[['Prestaciones sociales','Art. 142 lit. c · 30 días por año',284027.79],
-        ['Indemnización por despido','Art. 92 · monto igual a prestaciones',284027.79],
-        ['Vacaciones fraccionadas','Art. 196 · 5 meses del año en curso',13888.89],
-        ['Bono vacacional fraccionado','Art. 192',13888.89],
-        ['Utilidades fraccionadas','Art. 131 · 8 meses',33333.33]].map(r=>
-        `<tr><td><b>${r[0]}</b></td><td style="color:var(--ink-3);font-size:12.5px">${r[1]}</td>
-         <td class="num">${bs(r[2])}</td><td class="num">${bs(r[2]/TASA)}</td></tr>`).join('')}
+
+  ${s&&s.sin_movimientos?`<div class="note wa" style="margin-bottom:16px"><span class="ni">⚑</span>
+    <div>Este empleado <b>no tiene abonos de prestaciones registrados</b>. El simulador de abajo
+    igual calcula lo que le tocaría, porque el artículo 142 manda pagar el mayor entre lo acumulado
+    y los 30 días por año al último salario. ${esGerente()?
+    'Para empezar a acumular, cierra los trimestres con el botón de arriba.':''}</div></div>`:''}
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h">
+      <div><h3>Simulador de liquidación</h3>
+        <p class="sub">${esc(e.n)} · ${esc(e.cargo)} · USD ${e.sal} al mes</p></div>
+      <div class="spacer"></div>
+      <select class="filtro" style="min-width:190px" onchange="PREST.motivo=this.value;refrescarPrest()">
+        <option value="renuncia" ${PREST.motivo==='renuncia'?'selected':''}>Renuncia</option>
+        <option value="despido_injustificado" ${PREST.motivo==='despido_injustificado'?'selected':''}>Despido injustificado</option>
+        <option value="despido_justificado" ${PREST.motivo==='despido_justificado'?'selected':''}>Despido justificado</option>
+      </select>
+      <input type="date" style="width:auto" value="${PREST.fecha}"
+        onchange="PREST.fecha=this.value;refrescarPrest()">
+    </div>
+    ${q?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Concepto</th><th>Fundamento</th>
+        <th class="num">Bolívares</th><th class="num">USD</th></tr></thead>
+      <tbody>${renglonesLiq(q).map(r=>`<tr>
+        <td><b>${r[0]}</b></td>
+        <td style="color:var(--ink-3);font-size:12.5px">${r[1]}</td>
+        <td class="num">${bs(r[2])}</td><td class="num">${bs(r[2]/(q.tasa_bcv||TASA))}</td>
+      </tr>`).join('')}
         <tr style="background:var(--sunken)"><td colspan="2"><b>Total a pagar</b></td>
-          <td class="num"><b>629.166,69</b></td><td class="num"><b>2.516,67</b></td></tr>
-      </tbody></table></div></div>
-  ${ROL()!=='empleado'?`<div class="note cr"><span class="ni">▲</span>
-    <div><b>Pasivo laboral acumulado.</b> Es lo que habría que pagar si el personal saliera hoy.
-    La cifra sube cada mes.</div></div>`:''}`},
+          <td class="num"><b>${bs(q.total_liquidacion)}</b></td>
+          <td class="num"><b>${bs(q.total_usd)}</b></td></tr>
+      </tbody></table></div>
+    <div class="card-b" style="border-top:1px solid var(--line-2)">
+      <div class="stepnums">
+        <span>Salario diario normal <b>Bs. ${bs(q.salario_diario_normal)}</b></span>
+        <span>Salario diario integral <b>Bs. ${bs(q.salario_diario_integral)}</b></span>
+        <span>Antigüedad <b>${q.antiguedad_anios} años y ${q.antiguedad_meses-q.antiguedad_anios*12} meses</b></span>
+        <span>Tasa BCV <b>${bs(q.tasa_bcv)}</b></span>
+      </div>
+      ${+q.prestaciones_garantia>0 && +q.prestaciones_retroactivo>0 ? `
+      <div class="note in" style="margin-top:12px"><span class="ni">◔</span><div>
+        <b>Art. 142 lit. d:</b> se paga el mayor entre lo acumulado
+        (Bs. ${bs(q.prestaciones_garantia)}) y los 30 días por año al último salario
+        (Bs. ${bs(q.prestaciones_retroactivo)}). Aquí gana
+        <b>${+q.prestaciones_retroactivo >= +q.prestaciones_garantia ? 'el retroactivo':'lo acumulado'}</b>.
+      </div></div>`:''}
+    </div>`
+    :`<div class="empty"><b>Calculando…</b>Consultando el motor de liquidaciones.</div>`}
+  </div>
+
+  ${ROL()!=='empleado'&&PREST.pasivo?`<div class="card">
+    <div class="card-h"><h3>Pasivo laboral acumulado</h3>
+      <p class="sub">${tiendaFija()?nomTienda(tiendaFija()):'Toda la empresa'}</p></div>
+    <div class="card-b">
+      <div class="grid tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="tile"><div class="lab">Empleados</div>
+          <div class="val">${PREST.pasivo.empleados}</div></div>
+        <div class="tile"><div class="lab">Días acumulados</div>
+          <div class="val">${(+PREST.pasivo.dias).toFixed(0)}</div></div>
+        <div class="tile alert"><div class="lab">Provisión necesaria</div>
+          <div class="val">Bs. ${k(PREST.pasivo.saldo)}</div>
+          <div class="meta">USD ${k(PREST.pasivo.saldo/TASA)}</div></div>
+      </div>
+      <div class="note cr" style="margin-top:14px"><span class="ni">▲</span><div>
+        Es lo que la empresa debería tener provisionado hoy por prestaciones ya causadas.
+        Sube cada trimestre y con cada aumento de sueldo.</div></div>
+    </div></div>`:''}`;
+}},
 
 reportes:{ t:()=>'Reportes', h:()=>{
   const T = tiendaFija()?ESTADO.tiendas.filter(t=>t.codigo===tiendaFija())
@@ -2415,25 +2565,20 @@ usuarios:{ t:()=>'Usuarios del sistema', h:()=>{
     datos usa para decidir qué puede ver esa persona.</div></div>`;
 }},
 
-config:{ t:()=>'Configuración', h:()=>`
-  <div class="tabs">
-    <span class="tab on">Parámetros legales</span>
-    <span class="tab" onclick="ir('tiendas')">Tiendas</span>
-    <span class="tab" onclick="noDisponible('Datos de la empresa')">Empresa</span>
-    <span class="tab" onclick="noDisponible('Conceptos de nómina')">Conceptos de nómina</span>
-    <span class="tab" onclick="noDisponible('Histórico de tasas BCV')">Tasas BCV</span></div>
-  <div class="note wa" style="margin-bottom:16px"><span class="ni">⚑</span>
-    <div>Los parámetros <b>no se editan: se versionan</b>. Al cargar un valor nuevo, el anterior
-    se cierra con su fecha y queda en el histórico.</div></div>
-  <div class="card"><div class="card-h"><h3>Vigentes hoy</h3><div class="spacer"></div>
-    <button class="btn ghost sm" onclick="noDisponible('Carga de nueva vigencia')">+ Cargar nueva vigencia</button></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Parámetro</th><th class="num">Valor</th><th>Desde</th><th>Gaceta / fundamento</th></tr></thead>
-      <tbody>${ESTADO.param.length?ESTADO.param.map(r=>`<tr><td><b>${esc(r[0])}</b></td>
-        <td class="num">${esc(r[1])}</td><td class="mono">${fechaCorta(r[2])}</td>
-        <td style="color:var(--ink-3);font-size:12.5px">${esc(r[3])}</td></tr>`).join('')
-        :'<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:26px">Sin parámetros cargados</td></tr>'}
-      </tbody></table></div></div>`},
+config:{ t:()=>'Configuración', h:()=>{
+  const T = window.TAB_CFG || 'param';
+  const tab = (id,et) => `<span class="tab ${T===id?'on':''}"
+    onclick="window.TAB_CFG='${id}';pintar()">${et}</span>`;
+  return `<div class="tabs">
+      ${tab('param','Parámetros legales')}
+      <span class="tab" onclick="ir('tiendas')">Tiendas</span>
+      ${tab('empresa','Empresa')}
+      ${tab('conceptos','Conceptos de nómina')}
+      ${tab('tasas','Tasas BCV')}
+    </div>
+    ${T==='param'?cfgParametros():T==='empresa'?cfgEmpresa()
+      :T==='conceptos'?cfgConceptos():cfgTasas()}`;
+}},
 
 auditoria:{ t:()=>'Auditoría', h:()=>`
   <div class="card"><div class="card-h"><h3>Registro de acciones</h3>
@@ -2512,6 +2657,424 @@ const RECIBO={asig:[['Salario base · 16 días',26666.67],['Horas extra diurnas 
   ['Cestaticket',10000.00],['Bono de guerra económica',40000.00]],
   ded:[['IVSS · 4 %',18.00],['RPE Paro Forzoso · 0,5 %',2.25],['FAOV · 1 %',302.96]],
   tAsig:77916.67,tDed:323.21,neto:77593.45,salarial:27916.67,noSal:50000.00};
+
+/* =====================================================================
+   PESTAÑAS DE CONFIGURACIÓN
+   ===================================================================== */
+function cfgParametros(){
+  return `<div class="note wa" style="margin-bottom:16px"><span class="ni">⚑</span>
+    <div>Los parámetros <b>no se editan: se versionan</b>. Al cargar un valor nuevo, el anterior
+    se cierra con su fecha y queda en el histórico — así una nómina de 2026 recalculada en 2029
+    reproduce los valores de 2026.</div></div>
+  <div class="card"><div class="card-h"><h3>Vigentes hoy</h3>
+    <p class="sub">${ESTADO.paramRaw.length} parámetros</p><div class="spacer"></div>
+    ${esGerente()?`<button class="btn sm" style="width:auto" onclick="formVigencia()">
+      + Cargar nueva vigencia</button>`:''}</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Parámetro</th><th class="num">Valor</th><th>Desde</th>
+        <th>Gaceta / fundamento</th><th></th></tr></thead>
+      <tbody>${ESTADO.paramRaw.length?ESTADO.paramRaw.map(p=>`<tr>
+        <td><b>${esc(p.descripcion)}</b><div class="mini mono">${esc(p.clave)}</div></td>
+        <td class="num">${esc(formatoParam(p))}</td>
+        <td class="mono">${fechaCorta(p.vigente_desde)}</td>
+        <td style="color:var(--ink-3);font-size:12.5px">${
+          esc([p.gaceta_oficial,p.fundamento].filter(Boolean).join(' · ')||'—')}</td>
+        <td><div class="rowact">
+          <button class="iconbtn" title="Ver histórico"
+            onclick="verHistorico('${esc(p.clave)}')">⎘</button>
+          ${esGerente()?`<button class="iconbtn" title="Cargar valor nuevo"
+            onclick="formVigencia('${esc(p.clave)}')">✎</button>`:''}
+        </div></td></tr>`).join('')
+      :'<tr><td colspan="5" class="empty">Sin parámetros cargados</td></tr>'}
+      </tbody></table></div></div>`;
+}
+
+function formVigencia(clave){
+  const base = clave ? ESTADO.paramRaw.find(p=>p.clave===clave) : null;
+  modal(`<div class="modal"><div class="modal-h">
+      <h3>${base?'Nuevo valor · '+esc(base.descripcion):'Cargar parámetro'}</h3>
+      <button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      ${base?`<div class="note in" style="margin-bottom:16px"><span class="ni">◔</span><div>
+        Valor actual: <b>${esc(formatoParam(base))}</b> desde el ${fechaCorta(base.vigente_desde)}.
+        Al guardar, ese valor se cierra el día anterior a la fecha nueva y queda en el histórico.
+        </div></div>`:''}
+      <div class="frow">
+        <div><label>Clave</label><input id="v_clave" value="${esc(base?.clave||'')}"
+          ${base?'disabled':''} placeholder="CESTATICKET">
+          <p class="hintx">${base?'La clave identifica el parámetro y no cambia.'
+            :'En mayúsculas y sin espacios. Es lo que usan los cálculos.'}</p></div>
+        <div><label>Descripción</label><input id="v_desc" value="${esc(base?.descripcion||'')}"
+          placeholder="Cestaticket socialista mensual"></div>
+      </div>
+      <div class="frow">
+        <div><label>Valor</label><input id="v_valor" type="number" step="0.000001"
+          value="${base?base.valor:''}" placeholder="40">
+          <p class="hintx">Los porcentajes se escriben en decimal: 4 % es <b>0.04</b>.</p></div>
+        <div><label>Unidad</label><select id="v_unidad">
+          ${['monto','porcentaje','dias','factor'].map(u=>
+            `<option value="${u}" ${base?.unidad===u?'selected':''}>${u}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="frow">
+        <div><label>Moneda</label><select id="v_moneda">
+          <option value="" ${!base?.moneda?'selected':''}>— No aplica —</option>
+          <option value="VES" ${base?.moneda==='VES'?'selected':''}>Bolívares</option>
+          <option value="USD" ${base?.moneda==='USD'?'selected':''}>Dólares</option>
+        </select></div>
+        <div><label>Vigente desde</label><input id="v_desde" type="date" value="${hoy()}">
+          <p class="hintx">Puede ser una fecha pasada si el decreto ya está vigente.</p></div>
+      </div>
+      <div class="frow">
+        <div><label>Gaceta Oficial</label><input id="v_gaceta" value="${esc(base?.gaceta_oficial||'')}"
+          placeholder="G.O. 43.140"></div>
+        <div><label>Fundamento</label><input id="v_fund" value="${esc(base?.fundamento||'')}"
+          placeholder="Decreto 4.653"></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btnvig" style="width:auto" onclick="guardarVigencia()">
+        Cargar vigencia</button></div></div>`);
+}
+async function guardarVigencia(){
+  const g=k=>{const el=document.getElementById('v_'+k); return el?el.value.trim():''};
+  const clave=(g('clave')||'').toUpperCase().replace(/\s+/g,'_');
+  if(!clave) return aviso('Falta la clave');
+  if(!g('desc')) return aviso('Falta la descripción');
+  if(g('valor')==='') return aviso('Falta el valor');
+  const b=document.getElementById('btnvig'); b.disabled=true; b.textContent='Guardando…';
+  const r=await nuevaVigencia({clave, descripcion:g('desc'), valor:parseFloat(g('valor')),
+    moneda:g('moneda'), unidad:g('unidad'), desde:g('desde'),
+    gaceta:g('gaceta'), fundamento:g('fund')});
+  b.disabled=false; b.textContent='Cargar vigencia';
+  if(r){ cerrarModal(); pintar(); }
+}
+async function verHistorico(clave){
+  const h=await historicoParametro(clave);
+  modal(`<div class="modal"><div class="modal-h">
+      <h3>Histórico · ${esc(clave)}</h3><button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      ${h.length?`<div class="tbl-wrap"><table>
+        <thead><tr><th class="num">Valor</th><th>Desde</th><th>Hasta</th><th>Fundamento</th></tr></thead>
+        <tbody>${h.map(p=>`<tr>
+          <td class="num"><b>${esc(formatoParam(p))}</b></td>
+          <td class="mono">${fechaCorta(p.vigente_desde)}</td>
+          <td class="mono">${p.vigente_hasta?fechaCorta(p.vigente_hasta)
+            :'<span class="pill ok">Vigente</span>'}</td>
+          <td style="color:var(--ink-3);font-size:12.5px">${
+            esc([p.gaceta_oficial,p.fundamento].filter(Boolean).join(' · ')||'—')}</td>
+        </tr>`).join('')}</tbody></table></div>`
+      :'<div class="empty"><b>Sin histórico</b>Este parámetro solo tiene su valor actual.</div>'}
+    </div>
+    <div class="modal-f"><button class="btn sm" style="width:auto" onclick="cerrarModal()">Cerrar</button>
+    </div></div>`);
+}
+
+function cfgEmpresa(){
+  const e=ESTADO.empresa;
+  if(!e) return '<div class="empty"><b>Sin empresa</b>No se encontró el registro de la empresa.</div>';
+  const soloLectura = !esGerente();
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h3>Datos fiscales</h3>
+      <p class="sub">Aparecen en todos los recibos de pago</p></div>
+    <div class="card-b">
+      <div class="frow">
+        <div><label>Nombre comercial</label><input id="e_nombre" value="${esc(e.nombre||'')}" ${soloLectura?'disabled':''}></div>
+        <div><label>RIF</label><input id="e_rif" value="${esc(e.rif||'')}" ${soloLectura?'disabled':''}></div>
+      </div>
+      <div class="frow one"><div><label>Razón social</label>
+        <input id="e_razon" value="${esc(e.razon_social||'')}" ${soloLectura?'disabled':''}></div></div>
+      <div class="frow one"><div><label>Dirección fiscal</label>
+        <input id="e_dir" value="${esc(e.direccion_fiscal||'')}" ${soloLectura?'disabled':''}></div></div>
+      <div class="frow">
+        <div><label>Teléfono</label><input id="e_tel" value="${esc(e.telefono||'')}" ${soloLectura?'disabled':''}></div>
+        <div><label>Correo</label><input id="e_email" value="${esc(e.email||'')}" ${soloLectura?'disabled':''}></div>
+      </div>
+    </div></div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><h3>Políticas internas</h3>
+      <p class="sub">Lo que la ley deja a criterio de la empresa</p></div>
+    <div class="card-b">
+      <div class="frow">
+        <div><label>Días de utilidades</label>
+          <input id="e_util" type="number" min="30" max="120" value="${e.dias_utilidades||30}" ${soloLectura?'disabled':''}>
+          <p class="hintx">Entre 30 y 120 · art. 131 LOTTT</p></div>
+        <div><label>Tolerancia de retardo (min)</label>
+          <input id="e_tol" type="number" min="0" max="60" value="${e.tolerancia_retardo_min||10}" ${soloLectura?'disabled':''}>
+          <p class="hintx">Minutos de gracia antes de contar retardo</p></div>
+      </div>
+      <div class="frow">
+        <div><label>Días de vacaciones (base)</label>
+          <input id="e_vac" type="number" value="${e.dias_vacaciones_base||15}" ${soloLectura?'disabled':''}>
+          <p class="hintx">Mínimo legal 15 · art. 190 LOTTT</p></div>
+        <div><label>Días de bono vacacional (base)</label>
+          <input id="e_bv" type="number" value="${e.dias_bono_vacacional_base||15}" ${soloLectura?'disabled':''}>
+          <p class="hintx">Mínimo legal 15 · art. 192 LOTTT</p></div>
+      </div>
+    </div>
+    ${soloLectura?'':`<div class="modal-f" style="border-top:1px solid var(--line-2)">
+      <button class="btn sm" id="btnemp" style="width:auto" onclick="aplicarEmpresa()">Guardar cambios</button>
+    </div>`}</div>
+  ${soloLectura?`<div class="note in"><span class="ni">◔</span>
+    <div>Solo el gerente general puede modificar estos datos.</div></div>`:''}`;
+}
+async function aplicarEmpresa(){
+  const g=k=>document.getElementById('e_'+k).value.trim();
+  const util=parseInt(g('util'));
+  if(util<30||util>120) return aviso('Los días de utilidades deben estar entre 30 y 120');
+  const b=document.getElementById('btnemp'); b.disabled=true; b.textContent='Guardando…';
+  await guardarEmpresa({nombre:g('nombre'), rif:g('rif'), razon_social:g('razon'),
+    direccion_fiscal:g('dir'), telefono:g('tel'), email:g('email'),
+    dias_utilidades:util, tolerancia_retardo_min:parseInt(g('tol'))||10,
+    dias_vacaciones_base:parseInt(g('vac'))||15,
+    dias_bono_vacacional_base:parseInt(g('bv'))||15});
+  b.disabled=false; b.textContent='Guardar cambios'; pintar();
+}
+
+const CARACTER_ET={salarial:'Salarial', no_salarial:'No salarial',
+  deduccion:'Deducción', aporte_patronal:'Aporte patronal'};
+function cfgConceptos(){
+  const C=ESTADO.conceptos;
+  const grupo = c => C.filter(x=>x.caracter===c);
+  return `<div class="note in" style="margin-bottom:16px"><span class="ni">◔</span>
+    <div>Cada concepto declara si es <b>salarial</b> — y por tanto genera prestaciones,
+    vacaciones y utilidades — o si es una <b>bonificación sin incidencia</b>. La base de datos
+    impide que un concepto no salarial incida en prestaciones.</div></div>
+  <div class="grid tiles" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    ${Object.entries(CARACTER_ET).map(([k,et])=>`<div class="tile">
+      <div class="lab">${et}</div><div class="val">${grupo(k).length}</div></div>`).join('')}
+  </div>
+  <div class="card"><div class="card-h"><h3>Catálogo de conceptos</h3>
+    <p class="sub">${C.length} definidos</p><div class="spacer"></div>
+    ${esGerente()?`<button class="btn sm" style="width:auto" onclick="formConcepto()">+ Nuevo concepto</button>`:''}</div>
+    ${C.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Código</th><th>Concepto</th><th>Carácter</th><th>Moneda</th>
+        <th>Prestaciones</th><th>Utilidades</th><th>Activo</th><th></th></tr></thead>
+      <tbody>${C.map(c=>`<tr class="${esGerente()?'click':''}"
+        ${esGerente()?`onclick="formConcepto('${c.id}')"`:''}>
+        <td class="mono">${esc(c.codigo)}</td>
+        <td><b>${esc(c.nombre)}</b>${c.fundamento_legal?
+          `<div class="mini">${esc(c.fundamento_legal)}</div>`:''}</td>
+        <td><span class="pill ${c.caracter==='salarial'?'ok':c.caracter==='deduccion'?'cr':'nu'}">
+          ${CARACTER_ET[c.caracter]}</span></td>
+        <td class="mono">${esc(c.moneda)}</td>
+        <td>${c.incide_prestaciones?'<span class="pill ok">Sí</span>':'<span class="pill nu">No</span>'}</td>
+        <td>${c.incide_utilidades?'<span class="pill ok">Sí</span>':'<span class="pill nu">No</span>'}</td>
+        <td>${c.activo?'<span class="pill ok">Activo</span>':'<span class="pill nu">Inactivo</span>'}</td>
+        <td>${esGerente()?`<div class="rowact"><button class="iconbtn" title="Editar"
+          onclick="event.stopPropagation();formConcepto('${c.id}')">✎</button></div>`:''}</td>
+      </tr>`).join('')}</tbody></table></div>`
+    :'<div class="empty"><b>Sin conceptos</b>Carga el seed o crea el primero.</div>'}</div>`;
+}
+function formConcepto(id){
+  const c = id ? ESTADO.conceptos.find(x=>x.id===id) : null;
+  modal(`<div class="modal"><div class="modal-h">
+      <h3>${c?'Editar concepto':'Nuevo concepto'}</h3><button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      <div class="frow">
+        <div><label>Código</label><input id="k_cod" value="${esc(c?.codigo||'')}" ${c?'disabled':''} placeholder="205"></div>
+        <div><label>Nombre</label><input id="k_nom" value="${esc(c?.nombre||'')}" placeholder="Bono de productividad"></div>
+      </div>
+      <div class="frow">
+        <div><label>Carácter</label><select id="k_car" onchange="coherenciaConcepto()">
+          ${Object.entries(CARACTER_ET).map(([kk,et])=>
+            `<option value="${kk}" ${c?.caracter===kk?'selected':''}>${et}</option>`).join('')}
+        </select></div>
+        <div><label>Moneda</label><select id="k_mon">
+          <option value="VES" ${c?.moneda==='VES'?'selected':''}>Bolívares</option>
+          <option value="USD" ${c?.moneda==='USD'?'selected':''}>Dólares</option>
+        </select></div>
+      </div>
+      <div class="frow">
+        <div><label>Incide en prestaciones</label><select id="k_pre">
+          <option value="false" ${!c?.incide_prestaciones?'selected':''}>No</option>
+          <option value="true" ${c?.incide_prestaciones?'selected':''}>Sí</option></select></div>
+        <div><label>Incide en utilidades</label><select id="k_uti">
+          <option value="false" ${!c?.incide_utilidades?'selected':''}>No</option>
+          <option value="true" ${c?.incide_utilidades?'selected':''}>Sí</option></select></div>
+      </div>
+      <div class="frow">
+        <div><label>Se prorratea en quincenas</label><select id="k_pro">
+          <option value="true" ${c?.prorratea!==false?'selected':''}>Sí, se reparte</option>
+          <option value="false" ${c?.prorratea===false?'selected':''}>No, completo al cierre de mes</option>
+        </select></div>
+        <div><label>Activo</label><select id="k_act">
+          <option value="true" ${c?.activo!==false?'selected':''}>Sí</option>
+          <option value="false" ${c?.activo===false?'selected':''}>No</option></select></div>
+      </div>
+      <div class="frow one"><div><label>Fundamento legal</label>
+        <input id="k_fun" value="${esc(c?.fundamento_legal||'')}" placeholder="Art. 105 LOTTT"></div></div>
+      <div class="note wa" id="k_aviso" style="display:none"><span class="ni">⚑</span><div>
+        Un concepto <b>no salarial</b> no puede incidir en prestaciones ni en utilidades.
+        La base de datos rechazará la combinación.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btnconc" style="width:auto" onclick="guardarConceptoUI('${id||''}')">
+        ${c?'Guardar':'Crear'}</button></div></div>`);
+  coherenciaConcepto();
+}
+function coherenciaConcepto(){
+  const car=document.getElementById('k_car'); if(!car) return;
+  const noSal = car.value==='no_salarial';
+  document.getElementById('k_aviso').style.display = noSal?'flex':'none';
+  ['k_pre','k_uti'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(noSal){ el.value='false'; el.disabled=true; el.style.opacity=.5; }
+    else { el.disabled=false; el.style.opacity=1; }
+  });
+}
+async function guardarConceptoUI(id){
+  const g=k=>{const el=document.getElementById('k_'+k); return el?el.value.trim():''};
+  if(!g('nom')) return aviso('Falta el nombre');
+  if(!id && !g('cod')) return aviso('Falta el código');
+  const b=document.getElementById('btnconc'); b.disabled=true; b.textContent='Guardando…';
+  const d={nombre:g('nom'), caracter:g('car'), moneda:g('mon'),
+    incide_prestaciones:g('pre')==='true', incide_utilidades:g('uti')==='true',
+    incide_vacaciones:g('pre')==='true',
+    prorratea:g('pro')==='true', activo:g('act')==='true', fundamento_legal:g('fun')||null};
+  const r = id ? await guardarConcepto(id,d) : await crearConcepto({codigo:g('cod'),...d});
+  b.disabled=false; b.textContent=id?'Guardar':'Crear';
+  if(r){ cerrarModal(); pintar(); }
+}
+
+function cfgTasas(){
+  const T=ESTADO.tasas;
+  const ultima = T[0];
+  return `<div class="grid tiles" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="tile"><div class="lab">Tasa más reciente</div>
+      <div class="val">${ultima?bs(ultima.tasa_usd):'—'}</div>
+      <div class="meta">${ultima?'Del '+fechaCorta(ultima.fecha):'Sin tasas cargadas'}</div></div>
+    <div class="tile"><div class="lab">Registros</div><div class="val">${T.length}</div>
+      <div class="meta">Últimos 60 días</div></div>
+    <div class="tile ${T.some(t=>t.fecha===hoy())?'':'warn'}"><div class="lab">Tasa de hoy</div>
+      <div class="val" style="font-size:20px">${T.some(t=>t.fecha===hoy())?'Cargada':'Falta'}</div>
+      <div class="meta">${T.some(t=>t.fecha===hoy())?'Al día'
+        :'Sin ella la nómina no se calcula'}</div></div>
+  </div>
+  <div class="note in" style="margin-bottom:16px"><span class="ni">◔</span>
+    <div>Cada nómina <b>congela</b> la tasa del día de pago. Si falta la tasa, el cálculo
+    se detiene con un aviso en vez de emitir recibos en cero.</div></div>
+  <div class="card"><div class="card-h"><h3>Histórico de tasas BCV</h3>
+    <p class="sub">Bolívares por dólar</p><div class="spacer"></div>
+    ${esGerente()?`<button class="btn sm" style="width:auto" onclick="formTasa()">+ Cargar tasa</button>`:''}</div>
+    ${T.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th class="num">Bs. por USD</th><th>Origen</th><th class="num">Variación</th></tr></thead>
+      <tbody>${T.map((t,i)=>{
+        const prev=T[i+1];
+        const dif = prev ? ((t.tasa_usd-prev.tasa_usd)/prev.tasa_usd*100) : null;
+        return `<tr>
+        <td class="mono">${fechaCorta(t.fecha)}${t.fecha===hoy()?' <span class="pill ok">hoy</span>':''}</td>
+        <td class="num"><b>${bs(t.tasa_usd)}</b></td>
+        <td><span class="pill ${t.origen==='bcv_oficial'?'ok':'nu'}">${
+          t.origen==='bcv_oficial'?'BCV oficial':t.origen==='manual'?'Manual':'Promedio'}</span></td>
+        <td class="num" style="color:${dif===null?'var(--ink-3)':dif>0?'var(--crit)':dif<0?'var(--good)':'var(--ink-3)'}">
+          ${dif===null?'—':(dif>0?'+':'')+dif.toFixed(2).replace('.',',')+' %'}</td>
+      </tr>`}).join('')}</tbody></table></div>`
+    :'<div class="empty"><b>Sin tasas</b>Carga al menos la del día para poder calcular nómina.</div>'}</div>`;
+}
+function formTasa(){
+  const ultima=ESTADO.tasas[0];
+  modal(`<div class="modal" style="max-width:480px"><div class="modal-h">
+      <h3>Cargar tasa BCV</h3><button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      <div class="frow">
+        <div><label>Fecha</label><input id="ts_f" type="date" value="${hoy()}"></div>
+        <div><label>Bolívares por dólar</label><input id="ts_v" type="number" step="0.0001"
+          value="${ultima?ultima.tasa_usd:''}" placeholder="250.0000"></div>
+      </div>
+      <div class="frow one"><div><label>Origen</label><select id="ts_o">
+        <option value="bcv_oficial">BCV oficial</option>
+        <option value="manual">Carga manual</option>
+        <option value="promedio_bcv">Promedio BCV</option>
+      </select></div></div>
+      ${ultima?`<p class="hintx">Última registrada: <b>${bs(ultima.tasa_usd)}</b>
+        del ${fechaCorta(ultima.fecha)}.</p>`:''}
+      <div class="note in"><span class="ni">◔</span><div>Si ya existe una tasa para esa fecha,
+        se reemplaza. Las nóminas ya aprobadas conservan la tasa que congelaron.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btntasa" style="width:auto" onclick="aplicarTasa()">Guardar</button>
+    </div></div>`);
+}
+async function aplicarTasa(){
+  const f=document.getElementById('ts_f').value;
+  const v=parseFloat(document.getElementById('ts_v').value);
+  const o=document.getElementById('ts_o').value;
+  if(!f) return aviso('Falta la fecha');
+  if(!(v>0)) return aviso('La tasa debe ser mayor que cero');
+  const b=document.getElementById('btntasa'); b.disabled=true; b.textContent='Guardando…';
+  const r=await guardarTasa(f,v,o);
+  b.disabled=false; b.textContent='Guardar';
+  if(r){ cerrarModal(); pintar(); }
+}
+window.TAB_CFG='param';
+
+
+/* ---------- Estado y acciones del simulador ---------- */
+window.PREST = {empleado:null, motivo:'renuncia', fecha:new Date().toISOString().slice(0,10),
+                saldo:null, liq:null, pasivo:null};
+
+function renglonesLiq(q){
+  const R=[];
+  const n = x => +(q[x]||0);
+  R.push(['Prestaciones sociales','Art. 142 · el mayor entre lo acumulado y 30 días por año',
+          n('prestaciones_a_pagar')]);
+  if(n('intereses_prestaciones')>0)
+    R.push(['Intereses sobre prestaciones','Art. 143 · tasa activa BCV', n('intereses_prestaciones')]);
+  if(n('indemnizacion_art92')>0)
+    R.push(['Indemnización por despido','Art. 92 · monto igual a las prestaciones', n('indemnizacion_art92')]);
+  if(n('vacaciones_pendientes')>0)
+    R.push(['Vacaciones vencidas no disfrutadas','Art. 190', n('vacaciones_pendientes')]);
+  if(n('bono_vacacional_pendiente')>0)
+    R.push(['Bono vacacional pendiente','Art. 192', n('bono_vacacional_pendiente')]);
+  R.push(['Vacaciones fraccionadas','Art. 196 · proporción del año en curso', n('vacaciones_fraccionadas')]);
+  R.push(['Bono vacacional fraccionado','Art. 192', n('bono_vacacional_fraccionado')]);
+  R.push(['Utilidades fraccionadas','Art. 131 · meses trabajados del ejercicio', n('utilidades_fraccionadas')]);
+  return R.filter(r=>r[2]>0);
+}
+async function refrescarPrest(){
+  if(!PREST.empleado) return;
+  PREST.saldo = await pedirSaldo(PREST.empleado);
+  PREST.liq   = await pedirLiquidacion(PREST.empleado, PREST.fecha, PREST.motivo);
+  if(ROL()!=='empleado') PREST.pasivo = await pedirPasivo(FILTRO.tienda||tiendaFija());
+  pintar();
+}
+function elegirEmpleadoPrest(id){ PREST.empleado=id; PREST.saldo=null; PREST.liq=null; refrescarPrest(); }
+
+function formTrimestre(){
+  const hoyD=new Date(); const trimActual=Math.floor(hoyD.getMonth()/3)+1;
+  modal(`<div class="modal" style="max-width:480px"><div class="modal-h">
+      <h3>Cerrar trimestre de prestaciones</h3><button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      <p>Abona <b>15 días de salario integral</b> a cada empleado activo, como manda
+        el artículo 142 literal a de la LOTTT.</p>
+      <div class="frow" style="margin-top:16px">
+        <div><label>Año</label><input id="tr_a" type="number" value="${hoyD.getFullYear()}"></div>
+        <div><label>Trimestre</label><select id="tr_t">
+          ${[1,2,3,4].map(t=>`<option value="${t}" ${t===trimActual?'selected':''}>
+            ${t}.º trimestre</option>`).join('')}</select></div>
+      </div>
+      <div class="note in"><span class="ni">◔</span><div>
+        Cada empleado se abona con <b>su</b> salario integral de ese trimestre.
+        Si un trimestre ya fue cerrado, no se abona dos veces.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btntrim" style="width:auto" onclick="aplicarTrimestre()">
+        Cerrar trimestre</button></div></div>`);
+}
+async function aplicarTrimestre(){
+  const a=parseInt(document.getElementById('tr_a').value);
+  const t=parseInt(document.getElementById('tr_t').value);
+  const b=document.getElementById('btntrim'); b.disabled=true; b.textContent='Abonando…';
+  const r=await cerrarTrimestreRPC(a,t);
+  b.disabled=false; b.textContent='Cerrar trimestre';
+  if(r){
+    aviso(r.abonados ? `${r.abonados} empleados abonados en el ${t}.º trimestre de ${a}`
+                     : `El ${t}.º trimestre de ${a} ya estaba cerrado`);
+    cerrarModal(); await refrescarPrest();
+  }
+}
+
 </script>
 <script>
 /* =====================================================================
@@ -2578,7 +3141,9 @@ function cerrarMenu(){
   document.body.style.overflow='';
 }
 function ir(v){ if(!(MENU[ROL()]||[]).some(m=>m[0]===v)) return;
-  VISTA=v; FILTRO.texto=''; cerrarMenu(); pintar(); window.scrollTo(0,0); }
+  VISTA=v; FILTRO.texto=''; cerrarMenu(); pintar(); window.scrollTo(0,0);
+  if(v==='prestaciones' && !PREST.liq) refrescarPrest();
+}
 
 /* En pantallas estrechas cada fila se lee como ficha: para eso cada celda
    necesita saber a qué columna pertenece. */
