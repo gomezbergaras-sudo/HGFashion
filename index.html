@@ -247,6 +247,10 @@ td.num b{font-weight:600}
 .rline.tot{font-weight:700;border-top:1px solid var(--line);margin-top:7px;padding-top:7px}
 .rline .u{color:var(--ink-3);font-size:11px}
 .recibo .net{background:var(--sunken);font-weight:700;font-size:14.5px}
+/* La fórmula debajo de cada renglón: es lo que permite rehacer la cuenta */
+.rline .calc{display:block;font-family:"IBM Plex Mono","SFMono-Regular",monospace;
+  font-size:10.5px;color:var(--ink-3);line-height:1.45;margin-top:2px;white-space:normal}
+.rline span:first-child{flex:1;min-width:0}
 
 svg{max-width:760px;display:block}
 svg .grid line{stroke:var(--line-2);stroke-width:1}
@@ -321,8 +325,25 @@ textarea{width:100%;min-height:130px;padding:11px 13px;border:1px solid var(--li
   color:var(--ink-3);font-size:14px;transition:background .12s,color .12s}
 .iconbtn:hover{background:var(--sunken);color:var(--ink)}
 .iconbtn.del:hover{background:var(--crit-soft);color:var(--crit)}
-.previewtbl{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.previewtbl{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:6px}
 .previewtbl table{min-width:0}
+.previewtbl td{padding:5px 8px}
+/* Celdas editables dentro de una vista previa o de la nómina */
+.celda{width:100%;min-width:0;padding:5px 7px;font-size:13px;font-family:inherit;
+  border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink)}
+.celda:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.celda.num{text-align:right;font-variant-numeric:tabular-nums}
+.celda.vacia{border-color:var(--warn);background:var(--warn-soft)}
+.impbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px 12px;
+  background:var(--sunken);border:1px solid var(--line);border-radius:8px;font-size:13px}
+.impbar span{color:var(--ink-2)}
+/* Fila de nómina corregida a mano */
+/* Los controles de la cabecera de una tarjeta no deben empujar la página */
+.card-h{flex-wrap:wrap}
+.fecha-inline{width:auto;max-width:100%;min-width:0}
+@media (max-width:560px){ .fecha-inline{width:100%} .card-h .filtro{max-width:100%} }
+tr.ajustada{background:var(--warn-soft)}
+tr.ajustada td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .bad{background:var(--crit-soft)}
 .stepnums{display:flex;gap:20px;font-size:13px;color:var(--ink-3);margin-bottom:14px;flex-wrap:wrap}
 .stepnums b{color:var(--ink);font-family:"IBM Plex Mono",monospace}
@@ -358,6 +379,8 @@ textarea{width:100%;min-height:130px;padding:11px 13px;border:1px solid var(--li
 #printzone .ph span{font-size:11px;color:#555;display:block;line-height:1.4}
 #printzone .pt{text-align:right;margin-left:auto;font-size:11px;color:#555}
 #printzone .pt strong{display:block;font-size:13px;color:#111;font-family:"IBM Plex Mono",monospace}
+#printzone .calc{display:block;font-size:9.5px;color:#666;font-family:"IBM Plex Mono",monospace;
+  line-height:1.4;margin-top:1px}
 #printzone table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:12px}
 #printzone td,#printzone th{padding:5px 8px;border-bottom:1px solid #ddd;text-align:left}
 #printzone th{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#555;
@@ -509,7 +532,7 @@ textarea{width:100%;min-height:130px;padding:11px 13px;border:1px solid var(--li
       <button class="hamb" onclick="alternarMenu()" aria-label="Menú">☰</button>
       <h1 id="ptitle">Panel</h1>
       <div class="spacer"></div>
-      <div class="chip"><span class="dot"></span>BCV <b>Bs. 250,00</b></div>
+      <div class="chip" id="bcvchip"><span class="dot"></span>BCV <b>Bs. 250,00</b></div>
       <div class="chip" id="scopechip"></div>
       <button class="btn ghost sm" onclick="salir()">Salir</button>
     </header>
@@ -548,8 +571,26 @@ function conectar(){
 /* =====================================================================
    ESTADO — se llena desde Supabase al iniciar sesión
    ===================================================================== */
-const TASA = 250;
+/* La tasa NO es una constante: se lee siempre de la última que se cargó en
+   Configuración → Tasas BCV. Si no hay ninguna cargada usa 250 para no
+   romper la pantalla, pero el cálculo real de nómina lo hace la base de
+   datos, que sí se niega a calcular sin tasa del día. */
+/* ESTADO se declara con const, así que NO es una propiedad de window:
+   hay que nombrarlo directo. El try cubre el instante entre que se define
+   esta propiedad y que ESTADO existe. */
+function tasaHoy(){
+  try{ return (ESTADO.tasas && ESTADO.tasas[0]) || null; }catch(e){ return null; }
+}
+Object.defineProperty(window,'TASA',{ configurable:true, get(){
+  const t = tasaHoy();
+  const v = t ? +t.tasa_usd : 0;
+  return v > 0 ? v : 250;
+}});
 const bs  = n => (+n||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const bs4 = n => (+n||0).toLocaleString('es-VE',{minimumFractionDigits:4,maximumFractionDigits:4});
+/* Porcentaje con coma decimal, como se escribe en Venezuela */
+const pct = (f,d=1) => (+f*100).toFixed(d).replace('.',',');
+const num = (n,d=2) => (+n||0).toFixed(d).replace('.',',');
 const k   = n => n>=1e6 ? (n/1e6).toFixed(1).replace('.',',')+' M'
                 : n>=1e3 ? Math.round(n/1e3)+' K' : Math.round(n);
 const ini = s => (s||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -560,8 +601,18 @@ const uid = (()=>{let n=1000;return ()=>'tmp'+(++n)})();
 const ESTADO = {
  empresa:null, tiendas:[], empleados:[], cargos:[], usuarios:[],
  asistencia:{}, marcajes:[], incidencias:[], nominaAprobada:false,
- param:[], paramRaw:[], conceptos:[], tasas:[], auditoria:[],
+ param:[], paramRaw:[], conceptos:[], tasas:[], auditoria:[], sinHorario:[],
 };
+
+/* Lee un parámetro legal vigente por su clave. Devuelve el número crudo.
+   Nunca se escribe un valor legal a mano en el código: todos viven en la
+   tabla parametros_legales, con su fecha de vigencia y su gaceta. */
+function parLegal(clave, porDefecto){
+  try{
+    const p = (ESTADO.paramRaw||[]).find(x=>x.clave===clave);
+    return p ? +p.valor : porDefecto;
+  }catch(e){ return porDefecto; }
+}
 
 const ROL_ET = {gerente_general:'Gerente General', supervisor_tienda:'Supervisor de Tienda',
   supervisor_auxiliar:'Supervisor Auxiliar', empleado:'Empleado'};
@@ -698,7 +749,15 @@ async function cargarTodo(){
     sal: salPor[e.id] ? (salPor[e.id].moneda_salario==='USD'
           ? +salPor[e.id].salario_base : +salPor[e.id].salario_base/TASA) : 0,
     moneda: salPor[e.id]?.moneda_salario || 'USD',
+    // Beneficios propios: si vienen nulos manda el tabulador del cargo
+    complemento_usd: e.complemento_usd,
+    cestaticket_usd: e.cestaticket_usd,
+    islr: +e.porcentaje_retencion_islr || 0,
   }));
+
+  // Quién se queda sin medición de horas extra por no tener horario
+  try{ const {data:sh} = await sb.rpc('sin_horario'); ESTADO.sinHorario = sh || []; }
+  catch(e){ ESTADO.sinHorario = []; }
 
   CARGANDO=false;
   const err=[emp,tie,car,emps,usr].map(r=>r.error).filter(Boolean);
@@ -912,6 +971,39 @@ async function pedirPasivo(tiendaCod){
   if(error) return null;
   return data;
 }
+/* ---------- TABULADOR POR CARGO ---------- */
+async function guardarCargo(id, d){
+  const c = await conError(()=>sb.from('cargos').update({
+    salario_base_usd: d.salario_base_usd||0,
+    complemento_usd:  d.complemento_usd||0,
+    cestaticket_usd:  d.cestaticket_usd||0,
+  }).eq('id',id).select().single(), 'Tabulador guardado');
+  if(c){ const i=ESTADO.cargos.findIndex(x=>x.id===id); if(i>=0) ESTADO.cargos[i]=c; }
+  return c;
+}
+async function aplicarTabuladorRPC(cargoId, desde){
+  const n = await conError(()=>sb.rpc('aplicar_tabulador',
+    {p_cargo:cargoId, p_desde:desde||hoy()}));
+  if(n!==null) { aviso(`${n} trabajador${n===1?'':'es'} con el sueldo del tabulador`); await cargarTodo(); }
+  return n;
+}
+/* Complemento y cestaticket propios de un trabajador */
+async function guardarBeneficios(empId, d){
+  const e = await conError(()=>sb.from('empleados').update({
+    complemento_usd: d.complemento_usd===''?null:+d.complemento_usd,
+    cestaticket_usd: d.cestaticket_usd===''?null:+d.cestaticket_usd,
+  }).eq('id',empId).select().single(), 'Beneficios guardados');
+  if(e){ const l=ESTADO.empleados.find(x=>x.id===empId);
+         if(l){ l.complemento_usd=e.complemento_usd; l.cestaticket_usd=e.cestaticket_usd; } }
+  return e;
+}
+/* ---------- FIDEICOMISO Y TRIMESTRALES ---------- */
+async function pedirFideicomiso(empleadoId){
+  return await conError(()=>sb.rpc('fideicomiso', {p_empleado:empleadoId}));
+}
+async function pedirTrimestrales(empleadoId){
+  return await conError(()=>sb.rpc('prestaciones_trimestrales', {p_empleado:empleadoId}));
+}
 async function cerrarTrimestreRPC(anio, trim){
   return await conError(()=>sb.rpc('cerrar_trimestre',{p_anio:anio, p_trimestre:trim}));
 }
@@ -1047,6 +1139,124 @@ window.addEventListener('DOMContentLoaded', ()=>{
     'No se pudo cargar la librería de Supabase. Revisa tu conexión a internet y recarga.');
   arrancar();
 });
+</script>
+<script>
+/* =====================================================================
+   ESCRITOR DE .XLSX
+   Un .xlsx es un ZIP con unos cuantos XML adentro. Se arma a mano, con
+   las entradas guardadas sin comprimir (método 0), que es lo único que
+   hace falta para que Excel lo abra. Así no dependemos de ninguna
+   librería externa ni de que el navegador tenga CompressionStream.
+   ===================================================================== */
+const _crcTabla = (()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n;
+    for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1;
+    t[n]=c>>>0; }
+  return t; })();
+function _crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) c = _crcTabla[(c^bytes[i])&0xFF] ^ (c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function _zip(archivos){
+  const enc=new TextEncoder(); const partes=[]; const dir=[];
+  let off=0;
+  const u16=n=>[n&255,(n>>8)&255];
+  const u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];
+  archivos.forEach(f=>{
+    const nombre=enc.encode(f.nombre);
+    const datos =enc.encode(f.datos);
+    const crc=_crc32(datos);
+    const cab=[...u32(0x04034b50),...u16(20),...u16(0),...u16(0),...u16(0),...u16(0),
+               ...u32(crc),...u32(datos.length),...u32(datos.length),
+               ...u16(nombre.length),...u16(0)];
+    partes.push(new Uint8Array(cab), nombre, datos);
+    dir.push({nombre, crc, tam:datos.length, off});
+    off += cab.length + nombre.length + datos.length;
+  });
+  const central=[];
+  dir.forEach(d=>{
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0),...u16(0),
+      ...u16(0),...u16(0),...u32(d.crc),...u32(d.tam),...u32(d.tam),
+      ...u16(d.nombre.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(d.off)]));
+    central.push(d.nombre);
+  });
+  const tamCentral=central.reduce((a,x)=>a+x.length,0);
+  central.push(new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),
+    ...u16(dir.length),...u16(dir.length),...u32(tamCentral),...u32(off),...u16(0)]));
+  const todo=[...partes,...central];
+  const total=todo.reduce((a,x)=>a+x.length,0);
+  const salida=new Uint8Array(total); let p=0;
+  todo.forEach(x=>{ salida.set(x,p); p+=x.length; });
+  return new Blob([salida], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+const _xesc = s => String(s??'').replace(/[&<>"']/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+function _col(n){ let s=''; n++; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=(n-1-r)/26; } return s; }
+
+/* filas: matriz. La primera fila se toma como encabezado. */
+function bajarExcel(nombreArchivo, hoja, filas){
+  if(!filas || !filas.length) return aviso('No hay nada que exportar');
+  const xmlFilas = filas.map((fila,i)=>
+    `<row r="${i+1}">${fila.map((v,j)=>{
+      const ref=_col(j)+(i+1);
+      if(i>0 && typeof v==='number' && isFinite(v))
+        return `<c r="${ref}"><v>${v}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"${i===0?' s="1"':''}><is><t xml:space="preserve">${_xesc(v)}</t></is></c>`;
+    }).join('')}</row>`).join('');
+
+  const archivos=[
+   {nombre:'[Content_Types].xml', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`},
+   {nombre:'_rels/.rels', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`},
+   {nombre:'xl/_rels/workbook.xml.rels', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`},
+   {nombre:'xl/workbook.xml', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="${_xesc(hoja).slice(0,31)}" sheetId="1" r:id="rId1"/></sheets></workbook>`},
+   {nombre:'xl/styles.xml', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+</styleSheet>`},
+   {nombre:'xl/worksheets/sheet1.xml', datos:
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>${xmlFilas}</sheetData></worksheet>`},
+  ];
+
+  const blob=_zip(archivos);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download = nombreArchivo.endsWith('.xlsx') ? nombreArchivo : nombreArchivo+'.xlsx';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  aviso('Descargando '+a.download);
+}
 </script>
 <script>
 /* =====================================================================
@@ -1214,23 +1424,25 @@ function analizarImportacion(filas){
   const g=(f,c)=>String(f[mapa[c]]??'').trim();
 
   if(IMPORT.tipo==='empleados'){
-    const codigos=new Set(ESTADO.tiendas.map(t=>t.id));
-    const nombres={}; ESTADO.tiendas.forEach(t=>nombres[norm(t.n)]=t.id);
+    // Se reconoce la tienda por su CÓDIGO (T001) o por su NOMBRE, sin
+    // importar mayúsculas ni acentos. Si no se reconoce, la fila NO se
+    // rechaza: entra con la tienda vacía y se corrige con el selector.
+    const porCodigo={}, porNombre={};
+    ESTADO.tiendas.forEach(t=>{ porCodigo[norm(t.codigo)]=t.codigo;
+                                porNombre[norm(t.nombre)]=t.codigo; });
     const yaHay=new Set(ESTADO.empleados.map(e=>e.ci));
     const porDefecto = FILTRO.tienda || tiendaFija() || '';
     filas.slice(1).forEach((f,i)=>{
       const ci=g(f,'ci').replace(/[.\s-]/g,'').replace(/^[VE]/i,'');
-      let t=g(f,'t').trim();
-      if(!t) t = porDefecto;                      // usa la tienda seleccionada
-      else if(!codigos.has(t)) t = nombres[norm(t)] || codigos.has(t.toUpperCase()) ? t.toUpperCase() : (nombres[norm(t)]||'');
-      if(!codigos.has(t)) t = nombres[norm(g(f,'t'))] || '';
+      const crudo=g(f,'t').trim();
+      let t = crudo ? (porCodigo[norm(crudo)] || porNombre[norm(crudo)] || '') : porDefecto;
       const fila={ci, n:g(f,'n'), cargo:g(f,'cargo')||'Vendedor', t,
-                  ing:fechaExcel(g(f,'ing'))||'2026-01-01',
+                  tCrudo: crudo,
+                  ing:fechaExcel(g(f,'ing'))||hoy(),
                   sal:parseFloat(String(g(f,'sal')).replace(/[^\d.,]/g,'').replace(',','.'))||0};
       const err=[];
       if(!/^\d{6,9}$/.test(ci)) err.push('cédula inválida');
       if(!fila.n) err.push('falta el nombre');
-      if(!t) err.push(g(f,'t') ? 'tienda no reconocida: "'+g(f,'t')+'"' : 'sin tienda y ninguna seleccionada');
       if(yaHay.has(ci)) err.push('cédula ya registrada');
       if(err.length) IMPORT.errores.push({fila:i+2, datos:fila, err});
       else { IMPORT.validas.push(fila); yaHay.add(ci); }
@@ -1274,13 +1486,23 @@ function pintarPrevia(){
       Revisa que la primera fila del archivo tenga los encabezados.</div></div>`;
     botonImport(0); return;
   }
+  const sinTienda = tipo==='empleados' ? validas.filter(v=>!v.t).length : 0;
   const enc = tipo==='empleados'
     ? ['Cédula','Nombre','Cargo','Tienda','Ingreso','USD','Estado']
     : ['Cédula','Empleado','Fecha','Entrada','Almuerzo','Salida','Horas','Estado'];
-  const fila = v => tipo==='empleados'
-    ? `<td class="mono">${esc(v.ci)}</td><td><b>${esc(v.n)}</b></td><td>${esc(v.cargo)}</td>
-       <td><span class="pill nu">${esc(v.t)}</span></td><td class="mono">${fechaCorta(v.ing)}</td>
-       <td class="num">${v.sal}</td><td><span class="pill ok">Listo</span></td>`
+  const opcT = sel => ESTADO.tiendas.map(t=>
+      `<option value="${esc(t.codigo)}" ${t.codigo===sel?'selected':''}>${esc(t.codigo)} · ${esc(t.nombre)}</option>`).join('');
+  const fila = (v,i) => tipo==='empleados'
+    ? `<td class="mono">${esc(v.ci)}</td>
+       <td><input class="celda" value="${esc(v.n)}" onchange="editarFilaImp(${i},'n',this.value)"></td>
+       <td><input class="celda" value="${esc(v.cargo)}" onchange="editarFilaImp(${i},'cargo',this.value)"></td>
+       <td><select class="celda ${v.t?'':'vacia'}" onchange="editarFilaImp(${i},'t',this.value)">
+             <option value="">— elegir tienda —</option>${opcT(v.t)}</select>
+           ${!v.t&&v.tCrudo?`<div class="mini" style="color:var(--warn)">no reconocí "${esc(v.tCrudo)}"</div>`:''}</td>
+       <td><input class="celda" type="date" value="${esc(v.ing)}" onchange="editarFilaImp(${i},'ing',this.value)"></td>
+       <td class="num"><input class="celda num" type="number" step="0.01" value="${v.sal}"
+             onchange="editarFilaImp(${i},'sal',this.value)"></td>
+       <td>${v.t?'<span class="pill ok">Listo</span>':'<span class="pill wa">Falta tienda</span>'}</td>`
     : `<td class="mono">${esc(v.ci)}</td><td><b>${esc(v.nombre)}</b>
          <div class="mini">${esc(v.tienda)}</div></td>
        <td class="mono">${fechaCorta(v.fecha)}</td><td class="mono">${esc(v.ent||'—')}</td>
@@ -1296,10 +1518,19 @@ function pintarPrevia(){
      ${tipo==='asistencia'&&validas.length?`<span>Retardos detectados
        <b style="color:var(--warn)">${validas.filter(v=>v.retardo>0).length}</b></span>`:''}
    </div>
+   ${tipo==='empleados'?`<div class="impbar">
+     <span>Asignar <b>todas</b> las filas a:</span>
+     <select id="impmasiva" class="celda" style="min-width:200px">
+       <option value="">— elegir tienda —</option>
+       ${ESTADO.tiendas.map(t=>`<option value="${esc(t.codigo)}">${esc(t.codigo)} · ${esc(t.nombre)}</option>`).join('')}
+     </select>
+     <button class="btn ghost sm" style="width:auto" onclick="asignarTiendaATodas()">Aplicar a todas</button>
+     ${sinTienda?`<span class="pill wa">${sinTienda} sin tienda</span>`:'<span class="pill ok">Todas con tienda</span>'}
+   </div>`:''}
    <div class="previewtbl"><table>
      <thead><tr>${enc.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
      <tbody>
-     ${validas.slice(0,60).map(v=>`<tr>${fila(v)}</tr>`).join('')}
+     ${validas.slice(0,60).map((v,i)=>`<tr>${fila(v,i)}</tr>`).join('')}
      ${errores.slice(0,40).map(e=>`<tr class="bad">
        <td class="mono">${esc(e.datos.ci||'—')}</td>
        <td colspan="${enc.length-2}" style="font-size:12.5px;color:var(--crit)">
@@ -1309,10 +1540,28 @@ function pintarPrevia(){
    ${validas.length+errores.length>100?'<p class="hintx">Se muestran las primeras 100 filas; se cargarán todas las válidas.</p>':''}`;
   botonImport(validas.length);
 }
+/* Corrige una celda de la vista previa sin volver a leer el archivo. */
+function editarFilaImp(i, campo, valor){
+  const v = IMPORT.validas[i]; if(!v) return;
+  v[campo] = campo==='sal' ? (parseFloat(valor)||0) : String(valor).trim();
+  if(campo==='t') v.tCrudo='';
+  pintarPrevia();
+}
+/* Pone la misma tienda en todas las filas de la vista previa. */
+function asignarTiendaATodas(){
+  const sel=document.getElementById('impmasiva');
+  if(!sel || !sel.value) return aviso('Elige primero una tienda');
+  IMPORT.validas.forEach(v=>{ v.t=sel.value; v.tCrudo=''; });
+  pintarPrevia();
+  aviso(`${IMPORT.validas.length} filas asignadas a ${nomTienda(sel.value)}`);
+}
 function botonImport(n){
   const b=document.getElementById('btnimport'); if(!b) return;
-  b.disabled=!n; b.style.opacity=n?1:.45;
-  b.textContent = n ? (IMPORT.tipo==='empleados'
+  const faltan = IMPORT.tipo==='empleados' ? IMPORT.validas.filter(v=>!v.t).length : 0;
+  const listo = n>0 && !faltan;
+  b.disabled=!listo; b.style.opacity=listo?1:.45;
+  b.textContent = faltan ? `Faltan ${faltan} tienda${faltan===1?'':'s'} por asignar`
+    : n ? (IMPORT.tipo==='empleados'
       ? `Cargar ${n} empleado${n===1?'':'s'}`
       : `Cargar ${n} marcaje${n===1?'':'s'}`)
     : 'Nada que cargar';
@@ -1335,12 +1584,21 @@ function pegarImport(txt){
   if(!txt.trim()){ aviso('No pegaste nada'); return; }
   analizarImportacion(partirCSV(txt));
 }
-function confirmarImport(){
+async function confirmarImport(){
   if(!IMPORT.validas.length) return;
   if(IMPORT.tipo==='empleados'){
-    IMPORT.validas.forEach(v=>ESTADO.empleados.push({id:uid(),...v,est:'activo'}));
-    auditar('Importó empleados',`${IMPORT.validas.length} desde archivo`);
-    aviso(`${IMPORT.validas.length} empleados cargados`);
+    const faltan = IMPORT.validas.filter(v=>!v.t).length;
+    if(faltan) return aviso(`Faltan ${faltan} filas por asignarle tienda`);
+    const b=document.getElementById('btnimport');
+    if(b){ b.disabled=true; b.textContent='Guardando en la base…'; }
+    // Se escriben de verdad en Supabase, uno por uno, para poder decir
+    // exactamente cuáles fallaron y por qué.
+    const {creados, fallos} = await crearEmpleadosEnLote(IMPORT.validas);
+    if(fallos.length){
+      aviso(`${creados} cargados · ${fallos.length} fallaron (cédulas: ${fallos.slice(0,5).join(', ')}${fallos.length>5?'…':''})`);
+    } else {
+      aviso(`${creados} empleado${creados===1?'':'s'} guardado${creados===1?'':'s'} en la base de datos`);
+    }
   } else {
     IMPORT.validas.forEach(v=>{
       ESTADO.marcajes = ESTADO.marcajes.filter(m=>!(m.ci===v.ci && m.fecha===v.fecha));
@@ -1782,64 +2040,200 @@ function seleccionarTodos(cis){
   todos ? cis.forEach(c=>SEL_RECIBOS.delete(c)) : cis.forEach(c=>SEL_RECIBOS.add(c));
   pintar();
 }
-function reciboDe(e){
-  const asig=[['Salario base · 16 días', e.sal*TASA*0.5*0.8],
-              ['Horas extra diurnas', e.sal*TASA*0.03],
-              ['Cestaticket', 10000], ['Bono de guerra económica', 40000]];
-  const tA=asig.reduce((a,x)=>a+x[1],0);
-  const ded=[['IVSS · 4 %',18],['RPE Paro Forzoso · 0,5 %',2.25],['FAOV · 1 %',tA*0.0039]];
-  const tD=ded.reduce((a,x)=>a+x[1],0);
-  const salarial=asig.slice(0,2).reduce((a,x)=>a+x[1],0);
-  return {e,asig,ded,tA,tD,neto:tA-tD,salarial,noSal:tA-salarial};
+/* =====================================================================
+   LOS TRES RECIBOS
+   El sueldo, el complemento alimentario y el cestaticket se emiten por
+   separado. No es un capricho de formato: el cestaticket y el
+   complemento son bonificaciones sin incidencia salarial (art. 105
+   LOTTT) y meterlos en la misma hoja que el sueldo invita a que un
+   inspector los lea como parte de la remuneración.
+
+   Cada renglón lleva su fórmula escrita al lado, para que cualquiera
+   pueda rehacer la cuenta a mano.
+   ===================================================================== */
+const RECIBO_TIPOS = {
+  sueldo:      {et:'Recibo de pago',          sub:'Sueldo y horas extra',
+                nota:'Los montos de esta hoja son salario: generan prestaciones, vacaciones y utilidades.'},
+  complemento: {et:'Complemento alimentario', sub:'Bonificación no salarial',
+                nota:'Bonificación sin incidencia salarial · art. 105 LOTTT. No genera prestaciones.'},
+  cestaticket: {et:'Cestaticket socialista',  sub:'Beneficio de alimentación',
+                nota:'Beneficio de alimentación · Ley del Cestaticket Socialista. No es salario.'},
+};
+
+/* Horas extra del periodo, leídas de los marcajes cargados. */
+function extrasDe(e, desde, hasta){
+  const jor  = parLegal('JORNADA_HORAS_DIA', 8);
+  const tol  = parLegal('TOLERANCIA_SALIDA_MIN', 15);
+  const ini  = parLegal('JORNADA_NOCTURNA_INICIO', 19);
+  const fin  = parLegal('JORNADA_NOCTURNA_FIN', 5);
+  let diu=0, noc=0, dias=0, retardos=0;
+  (ESTADO.marcajes||[]).filter(m=>m.ci===e.ci &&
+      (!desde || m.fecha>=desde) && (!hasta || m.fecha<=hasta)).forEach(m=>{
+    dias++;
+    if(m.retardo>0) retardos++;
+    const salida = aMin(m.sal), prevista = aMin(m.salPrevista||'') ;
+    const base = prevista!=null ? prevista : (aMin(m.ent)!=null ? aMin(m.ent)+jor*60+(m.almuerzo||0) : null);
+    if(salida==null || base==null) return;
+    const exceso = Math.max(0, salida - base - tol);
+    if(!exceso) return;
+    let n=0;
+    for(let i=0;i<exceso;i++){
+      const h = Math.floor(((base+tol+i)/60))%24;
+      if(h>=ini || h<fin) n++;
+    }
+    noc += n/60; diu += (exceso-n)/60;
+  });
+  return {diurnas:+diu.toFixed(2), nocturnas:+noc.toFixed(2), dias, retardos, jornada:jor};
 }
+
+/* Arma uno de los tres recibos de un trabajador. */
+function calcularRecibo(e, tipo, per){
+  per = per || periodoActual();
+  const T   = TASA;
+  const mes = (e.sal||0) * T;                 // sueldo mensual en bolívares
+  const dia = mes/30;
+  const hora= dia / parLegal('JORNADA_HORAS_DIA', 8);
+  const dias= per.dias;
+  const asig=[], ded=[];
+
+  if(tipo==='sueldo'){
+    asig.push({et:`Salario base · ${dias} días`,
+               f:`USD ${bs(e.sal)} × ${bs4(T)} ÷ 30 × ${dias}`,
+               m: dia*dias, salarial:true});
+
+    const x = extrasDe(e, per.desde, per.hasta);
+    if(x.diurnas>0){
+      const rec = parLegal('RECARGO_HE_DIURNA', 0.5);
+      asig.push({et:`Horas extra diurnas · ${bs(x.diurnas)} h`,
+                 f:`${bs(x.diurnas)} h × Bs. ${bs(hora)} × ${num(1+rec)} · recargo del ${pct(rec,0)} % (art. 118 LOTTT)`,
+                 m: x.diurnas*hora*(1+rec), salarial:true});
+    }
+    if(x.nocturnas>0){
+      const rec = parLegal('RECARGO_HE_DIURNA', 0.5);
+      const noc = parLegal('RECARGO_NOCTURNO', 0.3);
+      asig.push({et:`Horas extra nocturnas · ${bs(x.nocturnas)} h`,
+                 f:`${bs(x.nocturnas)} h × Bs. ${bs(hora)} × ${num(1+rec)} × ${num(1+noc)} · hora extra (art. 118) más bono nocturno del ${pct(noc,0)} % (art. 117)`,
+                 m: x.nocturnas*hora*(1+rec)*(1+noc), salarial:true});
+    }
+
+    const tA = asig.reduce((a,x)=>a+x.m,0);
+    // Deducciones legales del trabajador, todas sobre salario
+    const ivss = parLegal('IVSS_TRABAJADOR', 0.04);
+    const rpe  = parLegal('RPE_TRABAJADOR', 0.005);
+    const faov = parLegal('FAOV_TRABAJADOR', 0.01);
+    ded.push({et:`IVSS · ${pct(ivss)} %`,
+              f:`Bs. ${bs(tA)} × ${pct(ivss)} % · Ley del Seguro Social`, m:tA*ivss});
+    ded.push({et:`Paro forzoso (RPE) · ${pct(rpe)} %`,
+              f:`Bs. ${bs(tA)} × ${pct(rpe)} % · Régimen Prestacional de Empleo`, m:tA*rpe});
+    ded.push({et:`FAOV · ${pct(faov)} %`,
+              f:`Bs. ${bs(tA)} × ${pct(faov)} % · Ley del Régimen Prestacional de Vivienda`, m:tA*faov});
+    if(e.islr>0) ded.push({et:`Retención de ISLR · ${num(e.islr)} %`,
+              f:`Bs. ${bs(tA)} × ${num(e.islr)} % · porcentaje declarado por el trabajador (AR-I)`,
+              m:tA*e.islr/100});
+  }
+
+  if(tipo==='complemento'){
+    const c = complementoDe(e);
+    asig.push({et:'Complemento alimentario',
+               f:`USD ${bs(c)} × ${bs4(T)} · bonificación no salarial (art. 105 LOTTT)`,
+               m: c*T, salarial:false});
+  }
+
+  if(tipo==='cestaticket'){
+    const c = cestaticketDe(e);
+    asig.push({et:'Cestaticket socialista',
+               f:`USD ${bs(c)} × ${bs4(T)} · Ley del Cestaticket Socialista`,
+               m: c*T, salarial:false});
+  }
+
+  const tA = asig.reduce((a,x)=>a+x.m,0);
+  const tD = ded.reduce((a,x)=>a+x.m,0);
+  const salarial = asig.filter(x=>x.salarial).reduce((a,x)=>a+x.m,0);
+  return {e, tipo, per, asig, ded, tA, tD, neto:tA-tD, salarial, noSal:tA-salarial};
+}
+
+/* Cascada empleado → cargo → parámetro general, igual que en la base. */
+function complementoDe(e){
+  if(e.complemento_usd!=null) return +e.complemento_usd;
+  const c = ESTADO.cargos.find(x=>x.id===e.cargo_id);
+  return c ? +(c.complemento_usd||0) : 0;
+}
+function cestaticketDe(e){
+  if(e.cestaticket_usd!=null) return +e.cestaticket_usd;
+  const c = ESTADO.cargos.find(x=>x.id===e.cargo_id);
+  if(c && +c.cestaticket_usd>0) return +c.cestaticket_usd;
+  return parLegal('CESTATICKET', 0);
+}
+/* Quincena en curso. */
+function periodoActual(){
+  const h = new Date(); const a=h.getFullYear(), m=h.getMonth();
+  const q2 = h.getDate()>15;
+  const d1 = new Date(a, m, q2?16:1);
+  const d2 = q2 ? new Date(a, m+1, 0) : new Date(a, m, 15);
+  const f = d => d.toISOString().slice(0,10);
+  return {desde:f(d1), hasta:f(d2), dias: q2 ? d2.getDate()-15 : 15,
+          et: `${d1.getDate()}/${String(m+1).padStart(2,'0')} – ${d2.getDate()}/${String(d2.getMonth()+1).padStart(2,'0')}/${a}`};
+}
+/* Se conserva el nombre viejo: lo usan las vistas de nómina y recibos. */
+function reciboDe(e){ return calcularRecibo(e,'sueldo'); }
+
 function hojaRecibo(r,i){
-  const {e}=r;
+  const {e,tipo} = r;
+  const M = RECIBO_TIPOS[tipo] || RECIBO_TIPOS.sueldo;
   return `<div class="hoja">
     <div class="ph"><img src="${LOGO}" alt="">
-      <div><b>INVERSIONES HG FASHION, C.A.</b>
-        <span>RIF: J-40123456-7</span>
-        <span>Av. Francisco de Miranda, Torre Delta, Chacao, Caracas</span>
-        <span>rrhh@hgfashion.com.ve · +58 212-555-0100</span></div>
-      <div class="pt">RECIBO DE PAGO<strong>0001-2026-${String(400+i).padStart(6,'0')}</strong>
-        <span>Emitido el 31/08/2026</span></div></div>
+      <div><b>${esc((ESTADO.empresa&&ESTADO.empresa.razon_social)||'INVERSIONES HG FASHION, C.A.')}</b>
+        <span>RIF: ${esc((ESTADO.empresa&&ESTADO.empresa.rif)||'J-40123456-7')}</span>
+        <span>${esc((ESTADO.empresa&&ESTADO.empresa.direccion_fiscal)||'')}</span>
+        <span>${esc((ESTADO.empresa&&ESTADO.empresa.email)||'')} ${esc((ESTADO.empresa&&ESTADO.empresa.telefono)||'')}</span></div>
+      <div class="pt">${M.et.toUpperCase()}<strong>${String(400+i).padStart(6,'0')}</strong>
+        <span>${M.sub} · ${fechaCorta(hoy())}</span></div></div>
     <div class="datos">
       <div><span>Empleado:</span> ${esc(e.n)}</div><div><span>C.I.:</span> V-${esc(e.ci)}</div>
       <div><span>Cargo:</span> ${esc(e.cargo)}</div><div><span>Tienda:</span> ${esc(e.t)} · ${esc(nomTienda(e.t))}</div>
       <div><span>Fecha de ingreso:</span> ${fechaCorta(e.ing)}</div>
-      <div><span>Periodo:</span> 16/08/2026 – 31/08/2026</div>
-      <div><span>Tipo de nómina:</span> Quincenal</div><div><span>Tasa BCV:</span> Bs. 250,0000/USD</div>
+      <div><span>Periodo:</span> ${esc(r.per.et)}</div>
+      <div><span>Tipo de nómina:</span> ${esc(e.tipo_nomina||'quincenal')}</div>
+      <div><span>Tasa BCV:</span> Bs. ${bs4(TASA)}/USD</div>
     </div>
-    <div class="sec">Asignaciones</div>
+    <div class="sec">${tipo==='sueldo'?'Asignaciones':'Concepto'}</div>
     <table><tbody>
-      ${r.asig.map(a=>`<tr><td>${a[0]}</td><td class="r">${bs(a[1])}</td>
-        <td class="r" style="color:#777">USD ${bs(a[1]/TASA)}</td></tr>`).join('')}
-      <tr style="font-weight:700"><td>Total asignaciones</td><td class="r">${bs(r.tA)}</td>
+      ${r.asig.filter(a=>!a.soloNota).map(a=>`<tr><td>${esc(a.et)}
+          <div class="calc">${esc(a.f)}</div></td>
+        <td class="r">${bs(a.m)}</td>
+        <td class="r" style="color:#777">USD ${bs(a.m/TASA)}</td></tr>`).join('')}
+      <tr style="font-weight:700"><td>Total</td><td class="r">${bs(r.tA)}</td>
         <td class="r">USD ${bs(r.tA/TASA)}</td></tr>
     </tbody></table>
-    <div class="sec">Deducciones</div>
+    ${r.ded.length?`<div class="sec">Deducciones</div>
     <table><tbody>
-      ${r.ded.map(a=>`<tr><td>${a[0]}</td><td class="r">${bs(a[1])}</td>
-        <td class="r" style="color:#777">USD ${bs(a[1]/TASA)}</td></tr>`).join('')}
+      ${r.ded.map(a=>`<tr><td>${esc(a.et)}<div class="calc">${esc(a.f)}</div></td>
+        <td class="r">${bs(a.m)}</td>
+        <td class="r" style="color:#777">USD ${bs(a.m/TASA)}</td></tr>`).join('')}
       <tr style="font-weight:700"><td>Total deducciones</td><td class="r">${bs(r.tD)}</td>
         <td class="r">USD ${bs(r.tD/TASA)}</td></tr>
-    </tbody></table>
+    </tbody></table>`:''}
     <table style="margin-top:10px"><tbody>
       <tr class="neto"><td>NETO A PAGAR</td><td class="r">Bs. ${bs(r.neto)}</td>
         <td class="r">USD ${bs(r.neto/TASA)}</td></tr>
     </tbody></table>
     <table style="margin-top:10px;font-size:10.5px;color:#555"><tbody>
-      <tr><td>Base para prestaciones sociales (salario normal)</td><td class="r">${bs(r.salarial)}</td></tr>
-      <tr><td>Bonificaciones sin incidencia salarial · art. 105 LOTTT</td><td class="r">${bs(r.noSal)}</td></tr>
+      <tr><td colspan="2">${esc(M.nota)}</td></tr>
+      ${tipo==='sueldo'?`<tr><td>Base para prestaciones sociales (salario normal)</td>
+        <td class="r">${bs(r.salarial)}</td></tr>`:''}
     </tbody></table>
     <div class="firma"><div>Firma del trabajador</div><div>Por la empresa</div></div>
   </div>`;
 }
-function imprimirRecibos(cis){
+function imprimirRecibos(cis, tipo){
+  tipo = tipo || 'sueldo';
   const emps = ESTADO.empleados.filter(e=>cis.includes(e.ci));
   if(!emps.length) return aviso('Selecciona al menos un recibo');
-  document.getElementById('printzone').innerHTML = emps.map((e,i)=>hojaRecibo(reciboDe(e),i)).join('');
-  auditar('Generó recibos', emps.length+' de '+(FILTRO.tienda||tiendaFija()||'varias tiendas'));
-  aviso(emps.length===1 ? 'Abriendo el recibo…' : `Abriendo ${emps.length} recibos…`);
+  const M = RECIBO_TIPOS[tipo] || RECIBO_TIPOS.sueldo;
+  document.getElementById('printzone').innerHTML =
+    emps.map((e,i)=>hojaRecibo(calcularRecibo(e,tipo),i)).join('');
+  aviso(emps.length===1 ? `Abriendo el ${M.et.toLowerCase()}…`
+                        : `Abriendo ${emps.length} hojas de ${M.et.toLowerCase()}…`);
   setTimeout(()=>window.print(), 250);
 }
 
@@ -2263,10 +2657,20 @@ incidencias:{ t:()=>ROL()==='empleado'?'Mis solicitudes':'Incidencias', h:()=>{
 nomina:{ t:()=>ROL()==='supervisor_tienda'?'Nómina de mi tienda':'Procesar nómina', h:()=>{
   const L=empleadosVisibles().filter(e=>e.est!=='egresado');
   const ap=ESTADO.nominaAprobada;
-  const filas=L.map(e=>{const asig=e.sal*TASA*0.5+e.sal*TASA*1.0;
-    const ded=asig*0.0041, neto=asig-ded; return {e,asig,ded,neto,sal:asig*0.358};});
+  const filas=L.map(e=>{
+    const r = calcularRecibo(e,'sueldo');
+    const c = calcularRecibo(e,'complemento').tA + calcularRecibo(e,'cestaticket').tA;
+    const A = AJUSTES[e.id] || {};
+    // Un ajuste manual manda sobre lo calculado, pero el original no se pierde
+    const asig = A.asig!=null ? +A.asig : r.tA + c;
+    const ded  = A.ded !=null ? +A.ded  : r.tD;
+    return {e, asig, ded, neto:asig-ded, sal:r.salarial,
+            asigCalc:r.tA+c, dedCalc:r.tD, ajuste:A.motivo?A:null};
+  });
   const T={asig:filas.reduce((a,f)=>a+f.asig,0), ded:filas.reduce((a,f)=>a+f.ded,0),
            neto:filas.reduce((a,f)=>a+f.neto,0)};
+  const per = periodoActual();
+  const editable = esGerente() && !ap;
   return `${barraFiltros({conBusqueda:false})}
   <div class="steps">
     <div class="step done"><div class="n">PASO 1 ✓</div><b>Corte de asistencia</b></div>
@@ -2276,10 +2680,13 @@ nomina:{ t:()=>ROL()==='supervisor_tienda'?'Nómina de mi tienda':'Procesar nóm
       <b>${ap?'Aprobada':(esGerente()?'Aprobación final':'Revisión')}</b></div>
   </div>
   <div class="grid tiles" style="margin-bottom:16px">
-    <div class="tile"><div class="lab">Periodo</div><div class="val" style="font-size:20px">16 – 31 ago</div>
-      <div class="meta">Quincenal · pago el 31/08/2026</div></div>
-    <div class="tile"><div class="lab">Tasa BCV congelada</div><div class="val">250<small>,00</small></div>
-      <div class="meta">Bs. por dólar · fijada al calcular</div></div>
+    <div class="tile"><div class="lab">Periodo</div>
+      <div class="val" style="font-size:20px">${esc(per.et)}</div>
+      <div class="meta">Quincenal · ${per.dias} días</div></div>
+    <div class="tile"><div class="lab">Tasa BCV congelada</div>
+      <div class="val">${bs(TASA).split(',')[0]}<small>,${bs(TASA).split(',')[1]}</small></div>
+      <div class="meta">${tasaHoy()?'Del '+fechaCorta(tasaHoy().fecha)+' · fijada al calcular'
+        :'⚠ Sin tasa cargada · cárgala en Configuración'}</div></div>
     <div class="tile"><div class="lab">Total neto</div><div class="val">Bs. ${k(T.neto)}</div>
       <div class="meta">USD ${k(T.neto/TASA)} · ${L.length} empleados</div></div>
     <div class="tile"><div class="lab">Costo total empresa</div><div class="val">Bs. ${k(T.neto*1.05)}</div>
@@ -2292,15 +2699,39 @@ nomina:{ t:()=>ROL()==='supervisor_tienda'?'Nómina de mi tienda':'Procesar nóm
     ${filas.length?`<div class="tbl-wrap"><table>
       <thead><tr><th>Empleado</th>${tiendaFija()?'':'<th>Tienda</th>'}<th class="num">Días</th>
         <th class="num">Asignaciones</th><th class="num">Deducciones</th><th class="num">Neto Bs.</th>
-        <th class="num">Neto USD</th><th class="num">Base prestaciones</th></tr></thead>
-      <tbody>${filas.map((f,i)=>`<tr class="click" onclick="ir('recibos')">
+        <th class="num">Neto USD</th><th class="num">Base prestaciones</th>
+        ${editable?'<th></th>':''}</tr></thead>
+      <tbody>${filas.map((f,i)=>`<tr class="${f.ajuste?'ajustada':''}">
         <td><div class="who"><div class="av" style="background:${COL[i%4]}">${ini(f.e.n)}</div>
-          <div><b>${esc(f.e.n)}</b><span>${esc(f.e.cargo)}</span></div></div></td>
+          <div><b>${esc(f.e.n)}</b><span>${esc(f.e.cargo)}</span>
+          ${f.ajuste?`<span class="mini" style="color:var(--warn)">✎ ${esc(f.ajuste.motivo)}</span>`:''}
+          </div></div></td>
         ${tiendaFija()?'':`<td><span class="pill nu">${esc(f.e.t)}</span></td>`}
-        <td class="num">16</td><td class="num">${bs(f.asig)}</td><td class="num">${bs(f.ded)}</td>
+        <td class="num">${per.dias}</td>
+        <td class="num">${editable
+          ? `<input class="celda num" type="number" step="0.01" value="${f.asig.toFixed(2)}"
+               title="Calculado: ${bs(f.asigCalc)}" onchange="ajustarNomina('${f.e.id}','asig',this.value)">`
+          : bs(f.asig)}</td>
+        <td class="num">${editable
+          ? `<input class="celda num" type="number" step="0.01" value="${f.ded.toFixed(2)}"
+               title="Calculado: ${bs(f.dedCalc)}" onchange="ajustarNomina('${f.e.id}','ded',this.value)">`
+          : bs(f.ded)}</td>
         <td class="num"><b>${bs(f.neto)}</b></td><td class="num">${bs(f.neto/TASA)}</td>
-        <td class="num" style="color:var(--brand)">${bs(f.sal)}</td></tr>`).join('')}
-      </tbody></table></div>`:'<div class="empty"><b>Sin empleados</b>Ajusta los filtros.</div>'}</div>
+        <td class="num" style="color:var(--brand)">${bs(f.sal)}</td>
+        ${editable?`<td><div class="acciones">
+          <button class="iconbtn" title="Ver el recibo" onclick="ir('recibos')">▤</button>
+          ${f.ajuste?`<button class="iconbtn" title="Deshacer el ajuste"
+            onclick="deshacerAjuste('${f.e.id}')">↺</button>`:''}
+        </div></td>`:''}
+        </tr>`).join('')}
+      </tbody></table></div>`:'<div class="empty"><b>Sin empleados</b>Ajusta los filtros.</div>'}
+    ${editable?`<div class="card-b" style="border-top:1px solid var(--line-2)">
+      <div class="note in"><span class="ni">◔</span><div>
+        Las columnas de <b>asignaciones</b> y <b>deducciones</b> se pueden corregir a mano cuando
+        el cálculo no da lo que hace falta. Cada corrección pide un motivo escrito y deja el
+        monto original guardado: al aprobar la nómina, la base de datos graba quién ajustó qué
+        y por qué. Una vez aprobada ya no se puede tocar.</div></div>
+    </div>`:''}</div>
   ${esGerente()?(ap?`<div class="note ok" style="background:var(--good-soft);border-color:transparent">
       <span class="ni" style="color:var(--good)">✓</span><div><b>Nómina aprobada y sellada.</b>
       Los recibos ya están disponibles para los trabajadores. Cualquier corrección exige
@@ -2316,34 +2747,48 @@ nomina:{ t:()=>ROL()==='supervisor_tienda'?'Nómina de mi tienda':'Procesar nóm
 }},
 
 recibos:{ t:()=>ROL()==='empleado'?'Mis recibos':'Recibos de pago', h:()=>{
-  if(ROL()==='empleado') return `
+  const TR = window.TIPO_RECIBO || 'sueldo';
+  const pestanasRecibo = ()=>`<div class="tabs" style="margin-bottom:14px">
+    ${Object.entries(RECIBO_TIPOS).map(([id,m])=>
+      `<span class="tab ${TR===id?'on':''}" onclick="window.TIPO_RECIBO='${id}';pintar()">${esc(m.et)}</span>`).join('')}
+  </div>`;
+
+  if(ROL()==='empleado'){
+    const yo = ESTADO.empleados.find(x=>x.usuario_id===SESION.id);
+    return `${pestanasRecibo()}
     <div class="grid" style="grid-template-columns:minmax(0,460px) minmax(0,1fr);align-items:start">
-      ${reciboHTML()}
-      <div class="card"><div class="card-h"><h3>Mis recibos anteriores</h3><div class="spacer"></div>
-        <button class="btn ghost sm" onclick="imprimirRecibos(['${
-          (ESTADO.empleados.find(e=>e.n===R().n)||{}).ci}'])">Descargar PDF</button></div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>N.º</th><th>Periodo</th><th class="num">Neto Bs.</th><th class="num">USD</th><th>Estado</th></tr></thead>
-          <tbody>${[['0001-2026-000418','16–31 ago 2026',77593.45,'visto'],
-                    ['0001-2026-000392','01–15 ago 2026',52410.20,'visto'],
-                    ['0001-2026-000361','16–31 jul 2026',51880.75,'visto'],
-                    ['0001-2026-000334','01–15 jul 2026',49220.10,'enviado']].map(r=>
-            `<tr><td class="mono" style="font-size:12px">${r[0]}</td><td>${r[1]}</td>
-             <td class="num">${bs(r[2])}</td><td class="num">${bs(r[2]/TASA)}</td>
-             <td>${r[3]==='visto'?'<span class="pill ok">Visto</span>':'<span class="pill in">Enviado</span>'}</td></tr>`).join('')}
-          </tbody></table></div></div>
+      ${reciboHTML(TR)}
+      <div class="card"><div class="card-h"><h3>Descargar</h3><div class="spacer"></div></div>
+        <div class="card-b">
+          <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">
+            Cada concepto se entrega en su propia hoja. El sueldo es salario; el complemento
+            alimentario y el cestaticket son bonificaciones que <b>no generan prestaciones</b>.</p>
+          ${yo?Object.entries(RECIBO_TIPOS).map(([id,m])=>
+            `<button class="btn ghost sm" style="width:100%;margin-bottom:8px"
+               onclick="imprimirRecibos(['${esc(yo.ci)}'],'${id}')">↧ ${esc(m.et)}</button>`).join('')
+          :'<div class="empty"><b>Sin ficha</b>Tu usuario todavía no está vinculado a un empleado.</div>'}
+        </div></div>
     </div>`;
+  }
 
   const L = empleadosVisibles().filter(e=>e.est!=='egresado');
   const cis = L.map(e=>e.ci);
   const sel = cis.filter(c=>SEL_RECIBOS.has(c));
   const alcance = FILTRO.tienda||tiendaFija();
+  const objetivo = JSON.stringify(sel.length?sel:cis).replace(/"/g,'&quot;');
   return `${barraFiltros({acciones:`
       <button class="btn ghost sm" onclick="seleccionarTodos(${JSON.stringify(cis).replace(/"/g,'&quot;')})">
-        ${sel.length===cis.length&&cis.length?'Quitar selección':'Seleccionar todos'}</button>
-      <button class="btn sm" style="width:auto" onclick="imprimirRecibos(${
-        JSON.stringify(sel.length?sel:cis).replace(/"/g,'&quot;')})">
-        ↧ Descargar ${sel.length?sel.length+' recibo'+(sel.length===1?'':'s'):'todos'}</button>`})}
+        ${sel.length===cis.length&&cis.length?'Quitar selección':'Seleccionar todos'}</button>`})}
+
+  <div class="card" style="margin-bottom:16px"><div class="card-b"
+      style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px"><b>Descargar ${sel.length?sel.length+' recibo'+(sel.length===1?'':'s'):'todos los recibos'}</b>
+      <p style="font-size:12.5px;color:var(--ink-3);margin-top:2px">
+        Un botón por tipo. Cada uno sale en su propia hoja.</p></div>
+    ${Object.entries(RECIBO_TIPOS).map(([id,m])=>
+      `<button class="btn ${id==='sueldo'?'':'ghost'} sm" style="width:auto"
+         onclick="imprimirRecibos(${objetivo},'${id}')">↧ ${esc(m.et)}</button>`).join('')}
+  </div></div>
 
   ${ROL()==='supervisor_tienda'?`<div class="note in" style="margin-bottom:16px"><span class="ni">◔</span>
     <div>Puedes descargar los recibos de <b>${esc(nomTienda(tiendaFija()))}</b>, tu tienda asignada.
@@ -2403,6 +2848,8 @@ prestaciones:{ t:()=>ROL()==='empleado'?'Mis prestaciones':'Prestaciones sociale
       ${esGerente()?`<button class="btn ghost sm" onclick="formTrimestre()">
         ⊞ Cerrar trimestre</button>`:''}
       <button class="btn ghost sm" onclick="refrescarPrest()">↻ Recalcular</button>
+      <button class="btn ghost sm" onclick="imprimirLiquidacion()">⎙ Imprimir</button>
+      <button class="btn ghost sm" onclick="excelLiquidacion()">↧ Excel</button>
     </div>`}
 
   <div class="grid tiles" style="margin-bottom:16px">
@@ -2436,7 +2883,7 @@ prestaciones:{ t:()=>ROL()==='empleado'?'Mis prestaciones':'Prestaciones sociale
         <option value="despido_injustificado" ${PREST.motivo==='despido_injustificado'?'selected':''}>Despido injustificado</option>
         <option value="despido_justificado" ${PREST.motivo==='despido_justificado'?'selected':''}>Despido justificado</option>
       </select>
-      <input type="date" style="width:auto" value="${PREST.fecha}"
+      <input type="date" class="fecha-inline" value="${PREST.fecha}"
         onchange="PREST.fecha=this.value;refrescarPrest()">
     </div>
     ${q?`<div class="tbl-wrap"><table>
@@ -2467,6 +2914,52 @@ prestaciones:{ t:()=>ROL()==='empleado'?'Mis prestaciones':'Prestaciones sociale
       </div></div>`:''}
     </div>`
     :`<div class="empty"><b>Calculando…</b>Consultando el motor de liquidaciones.</div>`}
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><div><h3>Prestaciones trimestrales</h3>
+      <p class="sub">15 días de salario integral por trimestre · art. 142 lit. a LOTTT</p></div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" onclick="imprimirTabla('trimestrales')">⎙ Imprimir</button>
+      <button class="btn ghost sm" onclick="excelTabla('trimestrales')">↧ Excel</button></div>
+    ${PREST.trim===null?'<div class="empty"><b>Cargando…</b>Consultando los abonos.</div>'
+     :PREST.trim.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Periodo</th><th class="num">Días</th><th class="num">Salario integral</th>
+        <th class="num">Abono Bs.</th><th class="num">Intereses</th><th class="num">Acumulado</th></tr></thead>
+      <tbody>${PREST.trim.map(t=>`<tr>
+        <td><b>${esc(t.periodo)}</b></td>
+        <td class="num">${(+t.dias).toFixed(2).replace('.',',')}</td>
+        <td class="num">${bs(t.salario_integral)}</td>
+        <td class="num">${bs(t.abono)}</td>
+        <td class="num">${bs(t.intereses)}</td>
+        <td class="num"><b>${bs(t.acumulado)}</b></td></tr>`).join('')}
+      </tbody></table></div>`
+     :`<div class="empty"><b>Sin trimestres cerrados</b>
+        ${esGerente()?'Usa «Cerrar trimestre» para hacer el primer abono.'
+                     :'La gerencia todavía no ha cerrado ningún trimestre.'}</div>`}
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-h"><div><h3>Fideicomiso de prestaciones</h3>
+      <p class="sub">Movimiento con saldo corrido · lo que se le entrega al trabajador</p></div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" onclick="imprimirTabla('fideicomiso')">⎙ Imprimir</button>
+      <button class="btn ghost sm" onclick="excelTabla('fideicomiso')">↧ Excel</button></div>
+    ${PREST.fide===null?'<div class="empty"><b>Cargando…</b>Consultando el fideicomiso.</div>'
+     :PREST.fide.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Concepto</th><th>Detalle</th><th class="num">Días</th>
+        <th class="num">Abono</th><th class="num">Retiro</th><th class="num">Saldo</th></tr></thead>
+      <tbody>${PREST.fide.map(f=>`<tr>
+        <td class="mono">${fechaCorta(f.fecha)}</td>
+        <td><b>${esc(f.concepto)}</b></td>
+        <td style="color:var(--ink-3);font-size:12.5px">${esc(f.detalle||'')}</td>
+        <td class="num">${(+f.dias).toFixed(2).replace('.',',')}</td>
+        <td class="num" style="color:var(--good)">${+f.abono?bs(f.abono):'—'}</td>
+        <td class="num" style="color:var(--crit)">${+f.retiro?bs(f.retiro):'—'}</td>
+        <td class="num"><b>${bs(f.saldo)}</b></td></tr>`).join('')}
+      </tbody></table></div>`
+     :`<div class="empty"><b>Sin movimientos</b>
+        Este trabajador no tiene abonos ni retiros registrados en el fideicomiso.</div>`}
   </div>
 
   ${ROL()!=='empleado'&&PREST.pasivo?`<div class="card">
@@ -2574,10 +3067,11 @@ config:{ t:()=>'Configuración', h:()=>{
       <span class="tab" onclick="ir('tiendas')">Tiendas</span>
       ${tab('empresa','Empresa')}
       ${tab('conceptos','Conceptos de nómina')}
+      ${tab('cargos','Cargos y tabulador')}
       ${tab('tasas','Tasas BCV')}
     </div>
     ${T==='param'?cfgParametros():T==='empresa'?cfgEmpresa()
-      :T==='conceptos'?cfgConceptos():cfgTasas()}`;
+      :T==='conceptos'?cfgConceptos():T==='cargos'?cfgCargos():cfgTasas()}`;
 }},
 
 auditoria:{ t:()=>'Auditoría', h:()=>`
@@ -2653,10 +3147,58 @@ function panelEmpleado(){ return `
   </div>`;
 }
 
-const RECIBO={asig:[['Salario base · 16 días',26666.67],['Horas extra diurnas · 4 h',1250.00],
-  ['Cestaticket',10000.00],['Bono de guerra económica',40000.00]],
-  ded:[['IVSS · 4 %',18.00],['RPE Paro Forzoso · 0,5 %',2.25],['FAOV · 1 %',302.96]],
-  tAsig:77916.67,tDed:323.21,neto:77593.45,salarial:27916.67,noSal:50000.00};
+/* El recibo de demostración desapareció: ahora todo se calcula desde el
+   sueldo real del trabajador y la tasa cargada. Ver calcularRecibo(). */
+window.TIPO_RECIBO = 'sueldo';
+
+/* =====================================================================
+   AJUSTES MANUALES DE NÓMINA
+   Corregir una línea a mano es legítimo: el cálculo automático no
+   siempre da lo que hace falta. Lo que no es legítimo es corregirla en
+   silencio, así que todo ajuste pide un motivo escrito y conserva el
+   monto original. La base de datos exige lo mismo (migración 014) y
+   además impide tocar una nómina ya aprobada.
+   ===================================================================== */
+window.AJUSTES = {};
+
+function ajustarNomina(empId, campo, valor){
+  const v = parseFloat(valor);
+  if(!isFinite(v) || v < 0){ aviso('Pon un monto válido'); pintar(); return; }
+  const e = ESTADO.empleados.find(x=>x.id===empId);
+  const A = AJUSTES[empId] || {};
+  const previo = A.motivo || '';
+  modal(`<div class="modal" style="max-width:480px"><div class="modal-h">
+      <h3>Corregir la nómina de ${esc(e?e.n:'')}</h3>
+      <button class="x" onclick="cancelarAjuste()">×</button></div>
+    <div class="modal-b">
+      <p style="font-size:14px">Vas a dejar las <b>${campo==='asig'?'asignaciones':'deducciones'}</b>
+        en <b>Bs. ${bs(v)}</b>.</p>
+      <div class="frow one"><div><label>¿Por qué?</label>
+        <input id="aj_m" value="${esc(previo)}"
+          placeholder="Ej.: se le pagó aparte el bono de inventario"></div></div>
+      <div class="note wa"><span class="ni">⚑</span><div>
+        El motivo se guarda con el ajuste y es lo que se le explica al trabajador
+        y, si hace falta, al inspector. El monto calculado queda registrado aparte.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cancelarAjuste()">Cancelar</button>
+      <button class="btn sm" style="width:auto"
+        onclick="confirmarAjuste('${empId}','${campo}',${v})">Guardar el ajuste</button>
+    </div></div>`);
+}
+function cancelarAjuste(){ cerrarModal(); pintar(); }
+function confirmarAjuste(empId, campo, valor){
+  const m = (document.getElementById('aj_m').value||'').trim();
+  if(!m) return aviso('El ajuste necesita un motivo escrito');
+  const A = AJUSTES[empId] || {};
+  A[campo] = valor; A.motivo = m; A.por = SESION && SESION.nombre; A.cuando = new Date().toISOString();
+  AJUSTES[empId] = A;
+  cerrarModal(); pintar();
+  aviso('Ajuste guardado · queda registrado quién y por qué');
+}
+function deshacerAjuste(empId){
+  delete AJUSTES[empId];
+  pintar(); aviso('Se restableció el cálculo automático');
+}
 
 /* =====================================================================
    PESTAÑAS DE CONFIGURACIÓN
@@ -2815,8 +3357,79 @@ function cfgEmpresa(){
     ${soloLectura?'':`<div class="modal-f" style="border-top:1px solid var(--line-2)">
       <button class="btn sm" id="btnemp" style="width:auto" onclick="aplicarEmpresa()">Guardar cambios</button>
     </div>`}</div>
+  ${soloLectura?'':`
+  <div class="card"><div class="card-h">
+      <div><h3>Horario de trabajo</h3>
+        <p class="sub">La hora de salida es contra la que se miden las horas extra</p></div>
+      <div class="spacer"></div>
+      <span class="pill ${(ESTADO.sinHorario||[]).length?'wa':'ok'}">
+        ${(ESTADO.sinHorario||[]).length
+          ? (ESTADO.sinHorario.length)+' sin horario'
+          : 'Todos con horario'}</span></div>
+    <div class="card-b">
+      ${(ESTADO.sinHorario||[]).length?`<div class="note wa" style="margin-bottom:14px">
+        <span class="ni">⚑</span><div>
+        A <b>${ESTADO.sinHorario.length} trabajador${ESTADO.sinHorario.length===1?'':'es'}</b>
+        no se le mide ni un minuto de hora extra, porque no tiene horario asignado y no hay
+        contra qué comparar la hora de salida.
+        ${ESTADO.sinHorario.slice(0,4).map(x=>esc(x.empleado)).join(', ')}${
+          ESTADO.sinHorario.length>4?' y '+(ESTADO.sinHorario.length-4)+' más':''}.
+        </div></div>`:''}
+      <div class="frow">
+        <div><label>Hora de entrada</label><input id="h_ent" type="time" value="09:00"></div>
+        <div><label>Hora de salida</label><input id="h_sal" type="time" value="18:00"></div>
+      </div>
+      <div class="frow">
+        <div><label>Inicio del almuerzo</label><input id="h_ai" type="time" value="13:00"></div>
+        <div><label>Fin del almuerzo</label><input id="h_af" type="time" value="14:00"></div>
+      </div>
+      <div class="frow">
+        <div><label>Días que se trabaja</label><select id="h_dias">
+          <option value="1,2,3,4,5,6">Lunes a sábado</option>
+          <option value="1,2,3,4,5">Lunes a viernes</option>
+          <option value="0,1,2,3,4,5,6">Todos los días</option>
+          <option value="2,3,4,5,6,0">Martes a domingo</option>
+        </select></div>
+        <div><label>Aplicar a</label><select id="h_tienda">
+          <option value="">Todas las tiendas</option>
+          ${ESTADO.tiendas.map(t=>`<option value="${esc(t.codigo)}">${esc(t.nombre)}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="note in"><span class="ni">◔</span><div>
+        La tolerancia de <b>${parLegal('TOLERANCIA_SALIDA_MIN',15)} minutos</b> después de la salida
+        se ajusta en <b>Parámetros legales</b>, con la clave TOLERANCIA_SALIDA_MIN.
+        Los minutos que pasen de ahí abren una solicitud de hora extra <b>pendiente de aprobación</b>;
+        los que caigan entre las 7 p.m. y las 5 a.m. llevan además el bono nocturno del art. 117.</div></div>
+    </div>
+    <div class="modal-f" style="border-top:1px solid var(--line-2)">
+      <button class="btn sm" id="btnhor" style="width:auto" onclick="aplicarHorario()">
+        Asignar este horario</button>
+    </div></div>`}
   ${soloLectura?`<div class="note in"><span class="ni">◔</span>
     <div>Solo el gerente general puede modificar estos datos.</div></div>`:''}`;
+}
+async function aplicarHorario(){
+  const b=document.getElementById('btnhor'); b.disabled=true; b.textContent='Asignando…';
+  const dias = document.getElementById('h_dias').value.split(',').map(Number);
+  const n = await conError(()=>sb.rpc('asignar_horario_estandar', {
+    p_nombre:'Horario de tienda',
+    p_entrada:document.getElementById('h_ent').value,
+    p_salida: document.getElementById('h_sal').value,
+    p_dias: dias,
+    p_almuerzo_inicio:document.getElementById('h_ai').value,
+    p_almuerzo_fin:   document.getElementById('h_af').value,
+    p_tienda: document.getElementById('h_tienda').value || null,
+    p_desde: hoy(),
+  }));
+  b.disabled=false; b.textContent='Asignar este horario';
+  if(n!==null){
+    aviso(`${n} trabajador${n===1?'':'es'} con horario asignado`);
+    await revisarHorarios(); pintar();
+  }
+}
+async function revisarHorarios(){
+  const r = await conError(()=>sb.rpc('sin_horario'));
+  ESTADO.sinHorario = r || [];
 }
 async function aplicarEmpresa(){
   const g=k=>document.getElementById('e_'+k).value.trim();
@@ -2972,6 +3585,131 @@ function cfgTasas(){
       </tr>`}).join('')}</tbody></table></div>`
     :'<div class="empty"><b>Sin tasas</b>Carga al menos la del día para poder calcular nómina.</div>'}</div>`;
 }
+/* =====================================================================
+   TABULADOR SALARIAL POR CARGO
+   El sueldo base no es el mismo para un vendedor que para un encargado.
+   Aquí se fija por cargo y se aplica a todos los que lo ocupan; el
+   histórico de salarios sigue siendo la única verdad de lo que gana
+   cada quien, y aplicar el tabulador abre una vigencia nueva.
+   ===================================================================== */
+function cfgCargos(){
+  const C = ESTADO.cargos || [];
+  const cuenta = id => ESTADO.empleados.filter(e=>e.cargo_id===id && e.est!=='egresado').length;
+  return `<div class="card"><div class="card-h">
+      <div><h3>Tabulador por cargo</h3>
+        <p class="sub">Sueldo base, complemento alimentario y cestaticket de cada cargo, en dólares</p></div>
+      <div class="spacer"></div>
+      ${esGerente()?`<button class="btn ghost sm" onclick="formCargo()">+ Cargo</button>`:''}</div>
+    ${C.length?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Cargo</th><th>Departamento</th><th class="num">Personas</th>
+        <th class="num">Sueldo USD</th><th class="num">Complemento USD</th>
+        <th class="num">Cestaticket USD</th><th class="num">Total USD</th>
+        ${esGerente()?'<th></th>':''}</tr></thead>
+      <tbody>${C.map(c=>{
+        // Si el cargo no fija cestaticket rige el parámetro general de la empresa
+        const cest = +c.cestaticket_usd>0 ? +c.cestaticket_usd : parLegal('CESTATICKET',0);
+        const tot=(+c.salario_base_usd||0)+(+c.complemento_usd||0)+cest;
+        const porc=tot? (+c.salario_base_usd||0)/tot*100 : 0;
+        return `<tr>
+        <td><b>${esc(c.nombre)}</b>${c.es_de_direccion?'<div class="mini">Trabajador de dirección · art. 37 LOTTT</div>':''}</td>
+        <td>${esc(c.departamento||'—')}</td>
+        <td class="num">${cuenta(c.id)}</td>
+        <td class="num">${bs(c.salario_base_usd)}</td>
+        <td class="num">${bs(c.complemento_usd)}</td>
+        <td class="num">${bs(cest)}${+c.cestaticket_usd>0?'':'<div class="mini">del parámetro general</div>'}</td>
+        <td class="num"><b>${bs(tot)}</b>
+          <div class="mini" style="color:${porc<50?'var(--warn)':'var(--ink-3)'}">
+            ${tot?porc.toFixed(0)+' % salario':'—'}</div></td>
+        ${esGerente()?`<td><div class="acciones">
+          <button class="iconbtn" title="Editar tabulador" onclick="formCargo('${c.id}')">✎</button>
+          <button class="iconbtn" title="Aplicar a los ${cuenta(c.id)} trabajadores del cargo"
+            onclick="confirmarTabulador('${c.id}')">⇩</button>
+        </div></td>`:''}
+      </tr>`}).join('')}
+      </tbody></table></div>`
+    :`<div class="empty"><b>Sin cargos</b>Crea el primero para poder armar el tabulador.</div>`}
+    <div class="card-b" style="border-top:1px solid var(--line-2)">
+      <div class="note wa"><span class="ni">⚑</span><div>
+        La columna <b>% salario</b> dice cuánto de lo que se le paga a ese cargo es sueldo de
+        verdad. Todo lo que va por complemento o cestaticket <b>no genera prestaciones,
+        vacaciones ni utilidades</b>. Si ese porcentaje es bajo, el pasivo laboral se ve
+        pequeño hoy pero cualquier reclamo se calcula sobre lo que debió ser salario.
+        Es una decisión que conviene conversar con su abogado laboral.</div></div>
+    </div></div>`;
+}
+function formCargo(id){
+  const c = id ? ESTADO.cargos.find(x=>x.id===id) : null;
+  if(id && !c) return aviso('No encontré ese cargo');
+  modal(`<div class="modal" style="max-width:540px"><div class="modal-h">
+      <h3>${c?'Tabulador de '+esc(c.nombre):'Cargo nuevo'}</h3>
+      <button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      ${c?'':`<div class="frow">
+        <div><label>Nombre del cargo</label><input id="cg_n" placeholder="Vendedor"></div>
+        <div><label>Departamento</label><input id="cg_d" placeholder="Ventas"></div></div>`}
+      <div class="frow">
+        <div><label>Sueldo base USD/mes</label><input id="cg_s" type="number" step="0.01"
+          value="${c?c.salario_base_usd:0}"></div>
+        <div><label>Complemento USD/mes</label><input id="cg_c" type="number" step="0.01"
+          value="${c?c.complemento_usd:0}"></div></div>
+      <div class="frow">
+        <div><label>Cestaticket USD/mes</label><input id="cg_k" type="number" step="0.01"
+          value="${c?c.cestaticket_usd:0}"></div>
+        <div><label>&nbsp;</label><p class="hintx" style="margin:0">
+          En cero usa el parámetro general de la empresa.</p></div></div>
+      <div class="note in"><span class="ni">◔</span><div>
+        Guardar solo cambia la plantilla del cargo. Para que el sueldo llegue a la gente hay
+        que <b>aplicar el tabulador</b>, que abre una vigencia nueva en el histórico salarial
+        sin borrar la anterior.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" style="width:auto" onclick="aplicarCargo('${id||''}')">Guardar</button>
+    </div></div>`);
+}
+async function aplicarCargo(id){
+  const d = {salario_base_usd:+document.getElementById('cg_s').value||0,
+             complemento_usd: +document.getElementById('cg_c').value||0,
+             cestaticket_usd: +document.getElementById('cg_k').value||0};
+  let r;
+  if(id) r = await guardarCargo(id, d);
+  else {
+    const n=(document.getElementById('cg_n').value||'').trim();
+    if(!n) return aviso('Ponle nombre al cargo');
+    r = await conError(()=>sb.from('cargos').insert({
+      empresa_id: ESTADO.empresa.id, nombre:n,
+      departamento:(document.getElementById('cg_d').value||'General').trim(), ...d
+    }).select().single(), 'Cargo creado');
+    if(r) ESTADO.cargos.push(r);
+  }
+  if(r){ cerrarModal(); pintar(); }
+}
+function confirmarTabulador(id){
+  const c = ESTADO.cargos.find(x=>x.id===id);
+  const n = ESTADO.empleados.filter(e=>e.cargo_id===id && e.est!=='egresado').length;
+  if(!n) return aviso('Ese cargo no tiene trabajadores activos');
+  if(!(+c.salario_base_usd>0)) return aviso('Primero cárgale un sueldo base al cargo');
+  modal(`<div class="modal" style="max-width:480px"><div class="modal-h">
+      <h3>Aplicar el tabulador</h3><button class="x" onclick="cerrarModal()">×</button></div>
+    <div class="modal-b">
+      <p style="font-size:14px">Se le va a poner <b>USD ${bs(c.salario_base_usd)}</b> mensuales a los
+        <b>${n}</b> trabajadores con el cargo de <b>${esc(c.nombre)}</b>.</p>
+      <div class="frow one"><div><label>Desde qué fecha rige</label>
+        <input id="tb_f" type="date" value="${hoy()}"></div></div>
+      <div class="note wa"><span class="ni">⚑</span><div>
+        A quien gane más de eso también se le baja. La vigencia anterior no se borra:
+        queda cerrada el día antes, y el histórico completo sigue disponible.</div></div>
+    </div>
+    <div class="modal-f"><button class="btn ghost sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn sm" id="btntab" style="width:auto"
+        onclick="lanzarTabulador('${id}')">Aplicar a los ${n}</button>
+    </div></div>`);
+}
+async function lanzarTabulador(id){
+  const b=document.getElementById('btntab'); b.disabled=true; b.textContent='Aplicando…';
+  const r = await aplicarTabuladorRPC(id, document.getElementById('tb_f').value);
+  cerrarModal(); if(r!==null) pintar();
+}
+
 function formTasa(){
   const ultima=ESTADO.tasas[0];
   modal(`<div class="modal" style="max-width:480px"><div class="modal-h">
@@ -3012,7 +3750,7 @@ window.TAB_CFG='param';
 
 /* ---------- Estado y acciones del simulador ---------- */
 window.PREST = {empleado:null, motivo:'renuncia', fecha:new Date().toISOString().slice(0,10),
-                saldo:null, liq:null, pasivo:null};
+                saldo:null, liq:null, pasivo:null, fide:null, trim:null};
 
 function renglonesLiq(q){
   const R=[];
@@ -3034,12 +3772,134 @@ function renglonesLiq(q){
 }
 async function refrescarPrest(){
   if(!PREST.empleado) return;
-  PREST.saldo = await pedirSaldo(PREST.empleado);
-  PREST.liq   = await pedirLiquidacion(PREST.empleado, PREST.fecha, PREST.motivo);
+  const [saldo, liq, fide, trim] = await Promise.all([
+    pedirSaldo(PREST.empleado),
+    pedirLiquidacion(PREST.empleado, PREST.fecha, PREST.motivo),
+    pedirFideicomiso(PREST.empleado),
+    pedirTrimestrales(PREST.empleado),
+  ]);
+  PREST.saldo=saldo; PREST.liq=liq;
+  PREST.fide=fide||[]; PREST.trim=trim||[];
   if(ROL()!=='empleado') PREST.pasivo = await pedirPasivo(FILTRO.tienda||tiendaFija());
   pintar();
 }
-function elegirEmpleadoPrest(id){ PREST.empleado=id; PREST.saldo=null; PREST.liq=null; refrescarPrest(); }
+function elegirEmpleadoPrest(id){
+  PREST.empleado=id; PREST.saldo=null; PREST.liq=null; PREST.fide=null; PREST.trim=null;
+  refrescarPrest();
+}
+
+/* =====================================================================
+   IMPRIMIR Y BAJAR A EXCEL
+   La liquidación es un documento que se firma y se archiva: tiene que
+   poder salir en papel y en hoja de cálculo, no solo en pantalla.
+   ===================================================================== */
+function _empPrest(){ return ESTADO.empleados.find(e=>e.id===PREST.empleado); }
+
+function imprimirLiquidacion(){
+  const q=PREST.liq, e=_empPrest();
+  if(!q || !e) return aviso('Todavía no hay liquidación calculada');
+  const MOT={renuncia:'Renuncia', despido_injustificado:'Despido injustificado',
+             despido_justificado:'Despido justificado'};
+  document.getElementById('printzone').innerHTML = `<div class="hoja">
+    <div class="ph"><img src="${LOGO}" alt="">
+      <div><b>${esc((ESTADO.empresa&&ESTADO.empresa.razon_social)||'INVERSIONES HG FASHION, C.A.')}</b>
+        <span>RIF: ${esc((ESTADO.empresa&&ESTADO.empresa.rif)||'—')}</span>
+        <span>${esc((ESTADO.empresa&&ESTADO.empresa.direccion_fiscal)||'')}</span></div>
+      <div class="pt">LIQUIDACIÓN DE PRESTACIONES<strong>${esc(MOT[PREST.motivo]||PREST.motivo)}</strong>
+        <span>Calculada el ${fechaCorta(hoy())}</span></div></div>
+    <div class="datos">
+      <div><span>Trabajador:</span> ${esc(e.n)}</div><div><span>C.I.:</span> V-${esc(e.ci)}</div>
+      <div><span>Cargo:</span> ${esc(e.cargo)}</div><div><span>Tienda:</span> ${esc(nomTienda(e.t))}</div>
+      <div><span>Ingreso:</span> ${fechaCorta(e.ing)}</div>
+      <div><span>Egreso:</span> ${fechaCorta(PREST.fecha)}</div>
+      <div><span>Antigüedad:</span> ${q.antiguedad_anios} años y ${q.antiguedad_meses-q.antiguedad_anios*12} meses</div>
+      <div><span>Tasa BCV:</span> Bs. ${bs4(q.tasa_bcv||TASA)}/USD</div>
+    </div>
+    <div class="sec">Conceptos</div>
+    <table><tbody>
+      ${renglonesLiq(q).map(r=>`<tr><td>${esc(r[0])}<div class="calc">${esc(r[1])}</div></td>
+        <td class="r">${bs(r[2])}</td>
+        <td class="r" style="color:#777">USD ${bs(r[2]/(q.tasa_bcv||TASA))}</td></tr>`).join('')}
+    </tbody></table>
+    <table style="margin-top:10px"><tbody>
+      <tr class="neto"><td>TOTAL A PAGAR</td><td class="r">Bs. ${bs(q.total_liquidacion)}</td>
+        <td class="r">USD ${bs(q.total_usd)}</td></tr>
+    </tbody></table>
+    <table style="margin-top:10px;font-size:10.5px;color:#555"><tbody>
+      <tr><td>Salario diario normal</td><td class="r">${bs(q.salario_diario_normal)}</td></tr>
+      <tr><td>Salario diario integral (art. 122 LOTTT)</td><td class="r">${bs(q.salario_diario_integral)}</td></tr>
+      <tr><td colspan="2">Art. 142 lit. d: se paga el mayor entre la garantía acumulada
+        (Bs. ${bs(q.prestaciones_garantia)}) y los 30 días por año al último salario
+        (Bs. ${bs(q.prestaciones_retroactivo)}).</td></tr>
+    </tbody></table>
+    <div class="firma"><div>Firma del trabajador</div><div>Por la empresa</div></div>
+  </div>`;
+  setTimeout(()=>window.print(), 250);
+}
+
+function excelLiquidacion(){
+  const q=PREST.liq, e=_empPrest();
+  if(!q || !e) return aviso('Todavía no hay liquidación calculada');
+  const t = q.tasa_bcv||TASA;
+  const filas=[['Concepto','Fundamento legal','Bolívares','USD']];
+  renglonesLiq(q).forEach(r=>filas.push([r[0], r[1], +(+r[2]).toFixed(2), +(r[2]/t).toFixed(2)]));
+  filas.push(['TOTAL A PAGAR','', +(+q.total_liquidacion).toFixed(2), +(+q.total_usd).toFixed(2)]);
+  filas.push([]);
+  filas.push(['Trabajador', e.n]);
+  filas.push(['Cédula', 'V-'+e.ci]);
+  filas.push(['Cargo', e.cargo]);
+  filas.push(['Tienda', nomTienda(e.t)]);
+  filas.push(['Ingreso', fechaCorta(e.ing)]);
+  filas.push(['Egreso', fechaCorta(PREST.fecha)]);
+  filas.push(['Motivo', PREST.motivo]);
+  filas.push(['Salario diario normal', +(+q.salario_diario_normal).toFixed(2)]);
+  filas.push(['Salario diario integral', +(+q.salario_diario_integral).toFixed(2)]);
+  filas.push(['Tasa BCV', +(+t).toFixed(4)]);
+  bajarExcel(`liquidacion-${e.ci}-${PREST.fecha}`, 'Liquidación', filas);
+}
+
+const _TABLAS_PREST = {
+  fideicomiso: {
+    hoja:'Fideicomiso', titulo:'Fideicomiso de prestaciones',
+    enc:['Fecha','Concepto','Detalle','Días','Salario integral','Abono','Retiro','Saldo'],
+    datos:()=>(PREST.fide||[]).map(f=>[fechaCorta(f.fecha), f.concepto, f.detalle||'',
+      +(+f.dias).toFixed(2), +(+f.salario_integral).toFixed(2),
+      +(+f.abono).toFixed(2), +(+f.retiro).toFixed(2), +(+f.saldo).toFixed(2)]),
+  },
+  trimestrales: {
+    hoja:'Trimestrales', titulo:'Prestaciones trimestrales · art. 142 lit. a LOTTT',
+    enc:['Periodo','Días','Salario integral','Abono','Intereses','Acumulado'],
+    datos:()=>(PREST.trim||[]).map(t=>[t.periodo, +(+t.dias).toFixed(2),
+      +(+t.salario_integral).toFixed(2), +(+t.abono).toFixed(2),
+      +(+t.intereses).toFixed(2), +(+t.acumulado).toFixed(2)]),
+  },
+};
+function excelTabla(cual){
+  const T=_TABLAS_PREST[cual], e=_empPrest();
+  const d=T.datos();
+  if(!d.length) return aviso('Esa tabla está vacía');
+  bajarExcel(`${cual}-${e?e.ci:'empleado'}`, T.hoja, [T.enc, ...d]);
+}
+function imprimirTabla(cual){
+  const T=_TABLAS_PREST[cual], e=_empPrest();
+  const d=T.datos();
+  if(!d.length) return aviso('Esa tabla está vacía');
+  document.getElementById('printzone').innerHTML = `<div class="hoja">
+    <div class="ph"><img src="${LOGO}" alt="">
+      <div><b>${esc((ESTADO.empresa&&ESTADO.empresa.razon_social)||'INVERSIONES HG FASHION, C.A.')}</b>
+        <span>RIF: ${esc((ESTADO.empresa&&ESTADO.empresa.rif)||'—')}</span></div>
+      <div class="pt">${esc(T.titulo.toUpperCase())}<strong>${esc(e?e.n:'')}</strong>
+        <span>V-${esc(e?e.ci:'')} · ${fechaCorta(hoy())}</span></div></div>
+    <table style="margin-top:14px"><thead><tr>
+      ${T.enc.map((h,i)=>`<th style="text-align:${i?'right':'left'};border-bottom:1px solid #111;
+        padding:4px 6px;font-size:11px">${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${d.map(f=>`<tr>${f.map((v,i)=>`<td class="${i?'r':''}"
+        style="padding:3px 6px">${typeof v==='number'?bs(v):esc(v)}</td>`).join('')}</tr>`).join('')}
+      </tbody></table>
+    <div class="firma"><div>Firma del trabajador</div><div>Por la empresa</div></div>
+  </div>`;
+  setTimeout(()=>window.print(), 250);
+}
 
 function formTrimestre(){
   const hoyD=new Date(); const trimActual=Math.floor(hoyD.getMonth()/3)+1;
@@ -3080,33 +3940,42 @@ async function aplicarTrimestre(){
 /* =====================================================================
    RECIBO Y NAVEGACIÓN
    ===================================================================== */
-function reciboHTML(){
-  const e = ESTADO.empleados.find(x=>x.n===(ROL==='empleado'?R().n:'María Rodríguez'))
-         || ESTADO.empleados[0];
+function reciboHTML(tipo){
+  tipo = tipo || 'sueldo';
+  const e = (ROL()==='empleado'
+      ? ESTADO.empleados.find(x=>x.usuario_id===SESION.id)
+      : null) || ESTADO.empleados[0];
+  if(!e) return `<div class="card"><div class="empty"><b>Sin empleados</b>
+    No hay ninguna ficha para mostrar en el recibo.</div></div>`;
+  const r = calcularRecibo(e, tipo);
+  const M = RECIBO_TIPOS[tipo];
   return `<div class="recibo">
-    <div class="rh"><img src="data:image/png;base64,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" alt="" style="width:38px;height:38px;border-radius:50%;display:block;margin:0 auto 9px">
-      <b>INVERSIONES HG FASHION, C.A.</b>
-      <span>RIF: J-40123456-7 · Av. Francisco de Miranda, Chacao</span></div>
-    <div class="rs" style="text-align:center"><div class="rl">Recibo de pago</div>
-      <span class="mono" style="font-size:12px">N.º 0001-2026-000418</span></div>
+    <div class="rh"><img src="${LOGO}" alt="" style="width:38px;height:38px;border-radius:50%;display:block;margin:0 auto 9px">
+      <b>${esc((ESTADO.empresa&&ESTADO.empresa.razon_social)||'INVERSIONES HG FASHION, C.A.')}</b>
+      <span>RIF: ${esc((ESTADO.empresa&&ESTADO.empresa.rif)||'—')}</span></div>
+    <div class="rs" style="text-align:center"><div class="rl">${esc(M.et)}</div>
+      <span class="mono" style="font-size:12px">${esc(M.sub)}</span></div>
     <div class="rs">
       <div class="rline"><span>Empleado</span><span>${esc(e.n)}</span></div>
       <div class="rline"><span>C.I.</span><span>V-${esc(e.ci)}</span></div>
       <div class="rline"><span>Cargo</span><span>${esc(e.cargo)}</span></div>
       <div class="rline"><span>Tienda</span><span>${esc(e.t)} · ${esc(nomTienda(e.t))}</span></div>
-      <div class="rline"><span>Periodo</span><span>16/08/2026 – 31/08/2026</span></div>
-      <div class="rline"><span>Tasa BCV</span><span>250,0000</span></div></div>
-    <div class="rs"><div class="rl">Asignaciones</div>
-      ${RECIBO.asig.map(a=>`<div class="rline"><span>${a[0]}</span><span>${bs(a[1])}</span></div>`).join('')}
-      <div class="rline tot"><span>Total asignaciones</span><span>${bs(RECIBO.tAsig)}</span></div></div>
-    <div class="rs"><div class="rl">Deducciones</div>
-      ${RECIBO.ded.map(a=>`<div class="rline"><span>${a[0]}</span><span>${bs(a[1])}</span></div>`).join('')}
-      <div class="rline tot"><span>Total deducciones</span><span>${bs(RECIBO.tDed)}</span></div></div>
-    <div class="rs net"><div class="rline"><span>Neto a pagar</span><span>Bs. ${bs(RECIBO.neto)}</span></div>
-      <div class="rline u"><span>Equivalente</span><span>USD ${bs(RECIBO.neto/TASA)}</span></div></div>
+      <div class="rline"><span>Periodo</span><span>${esc(r.per.et)}</span></div>
+      <div class="rline"><span>Tasa BCV</span><span>${bs4(TASA)}</span></div></div>
+    <div class="rs"><div class="rl">${tipo==='sueldo'?'Asignaciones':'Concepto'}</div>
+      ${r.asig.filter(a=>!a.soloNota).map(a=>`<div class="rline"><span>${esc(a.et)}
+        <div class="calc">${esc(a.f)}</div></span><span>${bs(a.m)}</span></div>`).join('')}
+      <div class="rline tot"><span>Total</span><span>${bs(r.tA)}</span></div></div>
+    ${r.ded.length?`<div class="rs"><div class="rl">Deducciones</div>
+      ${r.ded.map(a=>`<div class="rline"><span>${esc(a.et)}
+        <div class="calc">${esc(a.f)}</div></span><span>${bs(a.m)}</span></div>`).join('')}
+      <div class="rline tot"><span>Total deducciones</span><span>${bs(r.tD)}</span></div></div>`:''}
+    <div class="rs net"><div class="rline"><span>Neto a pagar</span><span>Bs. ${bs(r.neto)}</span></div>
+      <div class="rline u"><span>Equivalente</span><span>USD ${bs(r.neto/TASA)}</span></div></div>
     <div class="rs" style="background:var(--surface-2)">
-      <div class="rline u"><span>Genera prestaciones</span><span>Bs. ${bs(RECIBO.salarial)} · 35,8 %</span></div>
-      <div class="rline u"><span>Sin incidencia salarial</span><span>Bs. ${bs(RECIBO.noSal)} · 64,2 %</span></div></div>
+      ${tipo==='sueldo'?`<div class="rline u"><span>Genera prestaciones</span>
+          <span>Bs. ${bs(r.salarial)}</span></div>`:''}
+      <div class="rline u"><span>${esc(M.nota)}</span><span></span></div></div>
   </div>`;
 }
 
@@ -3176,6 +4045,19 @@ function pintar(){
   const alcance = r.t ? nomTienda(r.t)
     : FILTRO.tienda ? nomTienda(FILTRO.tienda)
     : ESTADO.tiendas.length ? `Las ${ESTADO.tiendas.length} tiendas` : 'Sin tiendas';
+  // El chip de la tasa se repinta en cada render: si cargas una tasa nueva
+  // en Configuración, aquí arriba cambia de una vez.
+  const chipT = document.getElementById('bcvchip');
+  if(chipT){
+    const t = tasaHoy();
+    chipT.innerHTML = t
+      ? `<span class="dot"></span>BCV <b>Bs. ${bs(TASA)}</b>`
+      : `<span class="dot" style="background:var(--warn)"></span>BCV <b>sin cargar</b>`;
+    chipT.title = t ? 'Tasa del '+fechaCorta(t.fecha)+' · '+(t.origen||'BCV')
+                    : 'No hay ninguna tasa cargada. Configuración → Tasas BCV.';
+    chipT.style.cursor='pointer';
+    chipT.onclick = ()=>{ if(esGerente()){ window.TAB_CFG='tasas'; ir('config'); } };
+  }
   document.getElementById('scopechip').innerHTML =
     `<span style="color:var(--ink-3)">Alcance</span> <b>${esc(alcance)}</b>`;
   const V = VISTAS[VISTA] || VISTAS.panel;
